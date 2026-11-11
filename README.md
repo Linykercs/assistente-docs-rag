@@ -1,2 +1,3 @@
 # assistente-docs-rag
-Assistente que responde dúvidas sobre a documentaçãoda API X, com RAG e evals.
+
+Assistente que responde dúvidas sobre a documentação da API X, com RAG e evals.
