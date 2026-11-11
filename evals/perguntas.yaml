@@ -1,0 +1,94 @@
+# Conjunto de avaliação (evals) — assistente-docs-rag
+# Fonte: https://docs.asaas.com
+# Recorte: Autenticação, Cobranças e Webhooks
+#
+# Campos:
+#   resposta_esperada: escreva com suas palavras, conferindo na documentação
+#   fonte: URL da página onde a resposta está
+#   tem_resposta: false se a documentação não responde (o assistente deve dizer "não sei")
+
+- id: 1
+  categoria: autenticacao
+  pergunta: "Como eu me autentico na API? Onde vai a chave de API?"
+  resposta_esperada: ""
+  fonte: ""
+  tem_resposta: true
+
+- id: 2
+  categoria: autenticacao
+  pergunta: "Qual a diferença entre o ambiente de sandbox e o de produção, e quais são as URLs de cada um?"
+  resposta_esperada: ""
+  fonte: ""
+  tem_resposta: true
+
+- id: 3
+  categoria: cobrancas
+  pergunta: "Como crio uma cobrança via Pix?"
+  resposta_esperada: ""
+  fonte: ""
+  tem_resposta: true
+
+- id: 4
+  categoria: cobrancas
+  pergunta: "Como crio um boleto com vencimento e multa por atraso?"
+  resposta_esperada: ""
+  fonte: ""
+  tem_resposta: true
+
+- id: 5
+  categoria: cobrancas
+  pergunta: "Preciso cadastrar o cliente antes de criar uma cobrança?"
+  resposta_esperada: ""
+  fonte: ""
+  tem_resposta: true
+
+- id: 6
+  categoria: webhooks
+  pergunta: "Como configuro um webhook para saber quando um pagamento foi confirmado?"
+  resposta_esperada: ""
+  fonte: ""
+  tem_resposta: true
+
+- id: 7
+  categoria: webhooks
+  pergunta: "Quais eventos de webhook existem para cobranças?"
+  resposta_esperada: ""
+  fonte: ""
+  tem_resposta: true
+
+- id: 8
+  categoria: webhooks
+  pergunta: "O que acontece se o meu endpoint de webhook ficar fora do ar?"
+  resposta_esperada: ""
+  fonte: ""
+  tem_resposta: true
+
+- id: 9
+  categoria: webhooks
+  pergunta: "Como valido que um webhook veio mesmo do Asaas?"
+  resposta_esperada: ""
+  fonte: ""
+  tem_resposta: true
+
+- id: 10
+  categoria: cobrancas
+  pergunta: "Como estorno ou cancelo uma cobrança?"
+  resposta_esperada: ""
+  fonte: ""
+  tem_resposta: true
+
+# --- Casos de borda ---
+
+- id: 11
+  categoria: fora_do_recorte
+  pergunta: "Como faço para emitir nota fiscal pela API?"
+  resposta_esperada: "O assistente deve dizer que esse assunto não está na base que ele consulta."
+  fonte: ""
+  tem_resposta: false
+
+- id: 12
+  categoria: ambigua
+  pergunta: "Meu pagamento não apareceu, o que faço?"
+  resposta_esperada: "O assistente deve pedir mais contexto (Pix ou boleto? sandbox ou produção? webhook configurado?) em vez de chutar."
+  fonte: ""
+  tem_resposta: true
