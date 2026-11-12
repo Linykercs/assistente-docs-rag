@@ -1,0 +1,44 @@
+# Páginas da documentação do Asaas indexadas pelo assistente.
+#
+# A lista foi montada a partir dos índices públicos para LLMs (https://docs.asaas.com/llms.txt).
+# Para ampliar o recorte, adicione URLs aqui e rode `assistente-docs ingest`:
+# páginas removidas desta lista também são removidas do banco.
+
+urls:
+  # --- Autenticação e ambientes ---
+  - https://docs.asaas.com/docs/autenticação-1
+  - https://docs.asaas.com/docs/chaves-de-api
+  - https://docs.asaas.com/docs/sandbox
+  - https://docs.asaas.com/docs/api-key-de-sandbox-usada-em-produção
+
+  # --- Cobranças ---
+  - https://docs.asaas.com/docs/guia-de-cobrancas
+  - https://docs.asaas.com/docs/criando-um-cliente
+  - https://docs.asaas.com/docs/cobrancas-via-boleto
+  - https://docs.asaas.com/docs/pix
+  - https://docs.asaas.com/docs/cobrancas-via-pix
+  - https://docs.asaas.com/docs/cobrancas-via-cartao-de-credito
+  - https://docs.asaas.com/docs/criar-uma-cobranca-parcelada
+  - https://docs.asaas.com/docs/estornos
+  - https://docs.asaas.com/reference/criar-novo-cliente
+  - https://docs.asaas.com/reference/criar-nova-cobranca
+  - https://docs.asaas.com/reference/excluir-cobranca
+  - https://docs.asaas.com/reference/estornar-cobranca
+
+  # --- Webhooks ---
+  - https://docs.asaas.com/docs/sobre-os-webhooks
+  - https://docs.asaas.com/docs/criar-novo-webhook-pela-aplicacao-web
+  - https://docs.asaas.com/docs/criar-novo-webhook-pela-api
+  - https://docs.asaas.com/docs/receba-eventos-do-asaas-no-seu-endpoint-de-webhook
+  - https://docs.asaas.com/docs/como-implementar-idempotencia-em-webhooks
+  - https://docs.asaas.com/docs/polling-vs-webhooks
+  - https://docs.asaas.com/docs/eventos-de-webhooks
+  - https://docs.asaas.com/docs/webhook-para-cobrancas
+  - https://docs.asaas.com/docs/tipos-de-envio
+  - https://docs.asaas.com/docs/logs-de-webhooks
+  - https://docs.asaas.com/docs/penalização-de-filas
+  - https://docs.asaas.com/docs/fila-pausada
+  - https://docs.asaas.com/docs/como-reativar-fila-interrompida
+  - https://docs.asaas.com/docs/ips-oficiais-do-asaas
+  - https://docs.asaas.com/docs/faq-de-webhooks
+  - https://docs.asaas.com/reference/criar-novo-webhook
