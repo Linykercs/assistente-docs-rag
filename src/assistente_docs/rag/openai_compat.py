@@ -69,6 +69,7 @@ class OpenAICompatLlm:
         api_key: str,
         model: str,
         reasoning_effort: str | None = None,
+        temperature: float | None = None,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self._client = client
@@ -76,6 +77,7 @@ class OpenAICompatLlm:
         self._headers = {"Authorization": f"Bearer {api_key}"}
         self._model = model
         self._reasoning_effort = reasoning_effort
+        self._temperature = temperature
         self._sleep = sleep
 
     @property
@@ -102,6 +104,10 @@ class OpenAICompatLlm:
         }
         if self._reasoning_effort:
             payload["reasoning_effort"] = self._reasoning_effort
+        if self._temperature is not None:
+            payload["temperature"] = self._temperature
+            # Ollama also honors a fixed seed, which removes the remaining randomness.
+            payload["seed"] = 0
         response = self._post(payload)
         if response.status_code != httpx.codes.OK:
             raise LlmError(f"LLM API returned HTTP {response.status_code}: {response.text[:500]}")
