@@ -133,7 +133,12 @@ basta para usar o assistente e rodar as evals.
    LLM_API_KEY=<sua chave>
    LLM_MODEL=gemini-flash-latest
    JUDGE_MODEL=gemini-flash-latest
+   LLM_REASONING_EFFORT=low
    ```
+
+O plano gratuito às vezes fica sobrecarregado (HTTP 503 ou demora). O adaptador tenta de novo
+algumas vezes, e nas evals um caso que ainda assim falhar é pulado em vez de interromper a
+suíte.
 
 Groq, OpenRouter ou um Ollama local também funcionam: basta trocar `LLM_BASE_URL`, a chave e o
 modelo.

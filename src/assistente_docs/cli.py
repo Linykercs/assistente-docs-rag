@@ -117,6 +117,12 @@ def _eval(settings: Settings, *, dataset: Path, output_dir: Path) -> None:
         print(f"{metric}: {item.passed}/{item.total}")
     print(f"Relatório: {markdown_path} e {json_path}")
 
+    skipped = len(cases) - len(results)
+    if skipped:
+        print(f"{skipped} de {len(cases)} casos pulados por falha do LLM (veja o log).")
+    if not results:
+        raise SystemExit("Nenhum caso foi avaliado.")
+
 
 if __name__ == "__main__":
     main()
