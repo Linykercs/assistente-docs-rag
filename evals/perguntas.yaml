@@ -11,70 +11,70 @@
   categoria: autenticacao
   pergunta: "Como eu me autentico na API? Onde vai a chave de API?"
   resposta_esperada: ""
-  fonte: ""
+  fonte: "https://docs.asaas.com/docs/autenticação-1"
   tem_resposta: true
 
 - id: 2
   categoria: autenticacao
   pergunta: "Qual a diferença entre o ambiente de sandbox e o de produção, e quais são as URLs de cada um?"
   resposta_esperada: ""
-  fonte: ""
+  fonte: "https://docs.asaas.com/docs/sandbox"
   tem_resposta: true
 
 - id: 3
   categoria: cobrancas
   pergunta: "Como crio uma cobrança via Pix?"
   resposta_esperada: ""
-  fonte: ""
+  fonte: "https://docs.asaas.com/docs/cobrancas-via-pix"
   tem_resposta: true
 
 - id: 4
   categoria: cobrancas
   pergunta: "Como crio um boleto com vencimento e multa por atraso?"
   resposta_esperada: ""
-  fonte: ""
+  fonte: "https://docs.asaas.com/docs/cobrancas-via-boleto"
   tem_resposta: true
 
 - id: 5
   categoria: cobrancas
   pergunta: "Preciso cadastrar o cliente antes de criar uma cobrança?"
   resposta_esperada: ""
-  fonte: ""
+  fonte: "https://docs.asaas.com/docs/guia-de-cobrancas"
   tem_resposta: true
 
 - id: 6
   categoria: webhooks
   pergunta: "Como configuro um webhook para saber quando um pagamento foi confirmado?"
   resposta_esperada: ""
-  fonte: ""
+  fonte: "https://docs.asaas.com/docs/criar-novo-webhook-pela-aplicacao-web"
   tem_resposta: true
 
 - id: 7
   categoria: webhooks
   pergunta: "Quais eventos de webhook existem para cobranças?"
   resposta_esperada: ""
-  fonte: ""
+  fonte: "https://docs.asaas.com/docs/webhook-para-cobrancas"
   tem_resposta: true
 
 - id: 8
   categoria: webhooks
   pergunta: "O que acontece se o meu endpoint de webhook ficar fora do ar?"
   resposta_esperada: ""
-  fonte: ""
+  fonte: "https://docs.asaas.com/docs/sobre-os-webhooks"
   tem_resposta: true
 
 - id: 9
   categoria: webhooks
   pergunta: "Como valido que um webhook veio mesmo do Asaas?"
   resposta_esperada: ""
-  fonte: ""
+  fonte: "https://docs.asaas.com/docs/sobre-os-webhooks"
   tem_resposta: true
 
 - id: 10
   categoria: cobrancas
   pergunta: "Como estorno ou cancelo uma cobrança?"
   resposta_esperada: ""
-  fonte: ""
+  fonte: "https://docs.asaas.com/reference/estornar-cobranca"
   tem_resposta: true
 
 # --- Casos de borda ---
