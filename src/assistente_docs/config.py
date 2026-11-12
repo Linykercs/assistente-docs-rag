@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://postgres:postgres@localhost:5432/assistente_docs"
 
     # "anthropic" uses Claude. "openai_compat" uses any OpenAI-compatible API, such as
-    # Google Gemini, which has a free tier.
+    # Google Gemini or Groq, which have free tiers.
     llm_provider: LlmProvider = "anthropic"
     anthropic_api_key: SecretStr | None = None
     llm_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"

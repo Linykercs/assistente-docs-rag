@@ -5,14 +5,14 @@ on:
   workflow_dispatch:
     inputs:
       provider:
-        description: "LLM: claude (secret ANTHROPIC_API_KEY) ou gemini (gratuito, secret LLM_API_KEY)"
+        description: "LLM: claude (ANTHROPIC_API_KEY), groq (GROQ_API_KEY) ou gemini (LLM_API_KEY)"
         type: choice
-        options: [claude, gemini]
-        default: claude
+        options: [claude, groq, gemini]
+        default: groq
       model:
-        description: "Modelo do Gemini (só para gemini)"
+        description: "Modelo (vazio = padrão do provedor)"
         type: string
-        default: gemini-flash-latest
+        default: ""
 
 permissions:
   contents: read
@@ -38,12 +38,13 @@ jobs:
           --health-retries 10
 
     env:
-      LLM_PROVIDER: ${{ inputs.provider == 'gemini' && 'openai_compat' || 'anthropic' }}
+      LLM_PROVIDER: ${{ inputs.provider == 'claude' && 'anthropic' || 'openai_compat' }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-      LLM_MODEL: ${{ inputs.provider == 'gemini' && inputs.model || 'claude-sonnet-5-5' }}
-      JUDGE_MODEL: ${{ inputs.provider == 'gemini' && inputs.model || 'claude-sonnet-5-5' }}
-      LLM_REASONING_EFFORT: ${{ inputs.provider == 'gemini' && 'low' || '' }}
+      LLM_REASONING_EFFORT: ${{ inputs.provider != 'claude' && 'low' || '' }}
+      DEFAULT_MODEL: >-
+        ${{ inputs.provider == 'groq' && 'openai/gpt-oss-120b'
+        || inputs.provider == 'gemini' && 'gemini-flash-latest'
+        || 'claude-sonnet-5-5' }}
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/assistente_docs
       FASTEMBED_CACHE_PATH: ${{ github.workspace }}/.fastembed
 
@@ -56,6 +57,25 @@ jobs:
 
       - name: Install dependencies
         run: uv sync
+
+      - name: Select LLM provider
+        env:
+          PROVIDER: ${{ inputs.provider }}
+          MODEL: ${{ inputs.model }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.LLM_API_KEY }}
+        run: |
+          model="${MODEL:-$DEFAULT_MODEL}"
+          echo "LLM_MODEL=$model" >> "$GITHUB_ENV"
+          echo "JUDGE_MODEL=$model" >> "$GITHUB_ENV"
+          case "$PROVIDER" in
+            groq)
+              echo "LLM_BASE_URL=https://api.groq.com/openai/v1" >> "$GITHUB_ENV"
+              echo "LLM_API_KEY=$GROQ_API_KEY" >> "$GITHUB_ENV" ;;
+            gemini)
+              echo "LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai" >> "$GITHUB_ENV"
+              echo "LLM_API_KEY=$GEMINI_API_KEY" >> "$GITHUB_ENV" ;;
+          esac
 
       - name: Cache embedding model
         uses: actions/cache@v4

@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from assistente_docs.evals.dataset import EvalCase
 from assistente_docs.evals.judge import Judge
 from assistente_docs.evals.scoring import CaseResult, score_case
-from assistente_docs.rag.llm import LlmError
+from assistente_docs.rag.llm import LlmError, QuotaExhaustedError
 from assistente_docs.rag.service import AskService
 
 logger = logging.getLogger(__name__)
@@ -26,6 +26,10 @@ def run_evals(cases: Sequence[EvalCase], service: AskService, judge: Judge) -> l
                 if case.has_reference_answer
                 else None
             )
+        except QuotaExhaustedError as exc:
+            # Every remaining case would fail the same way, so stop here.
+            logger.error("case %d: %s Parando a suíte.", case.id, exc)
+            break
         except LlmError as exc:
             logger.warning("case %d skipped: %s", case.id, exc)
             continue
