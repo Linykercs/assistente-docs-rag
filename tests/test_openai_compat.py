@@ -33,7 +33,7 @@ def chat_response(content: str | None, **message: object) -> dict:
 
 
 def make_llm(
-    handler, *, reasoning_effort: str | None = None
+    handler, *, reasoning_effort: str | None = None, temperature: float | None = None
 ) -> tuple[OpenAICompatLlm, list[httpx.Request]]:
     requests: list[httpx.Request] = []
 
@@ -48,6 +48,7 @@ def make_llm(
         api_key="token-123",
         model="openai/x",
         reasoning_effort=reasoning_effort,
+        temperature=temperature,
         sleep=SLEEPS.append,
     )
     return llm, requests
@@ -159,6 +160,29 @@ def test_reasoning_effort_is_sent_only_when_configured() -> None:
         llm, requests = make_llm(ok, reasoning_effort=effort)
         LlmAnswerer(llm).answer("Pergunta?", [make_retrieved(1)])
         assert json.loads(requests[0].content).get("reasoning_effort") == effort
+
+
+def test_temperature_and_seed_are_sent_only_when_configured() -> None:
+    draft = json.dumps({"status": "answered", "answer": "Ok [1].", "cited_ids": [1]})
+
+    def ok(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=chat_response(draft))
+
+    llm, requests = make_llm(ok)
+    LlmAnswerer(llm).answer("Pergunta?", [make_retrieved(1)])
+    assert "temperature" not in json.loads(requests[0].content)
+
+    llm, requests = make_llm(ok, temperature=0)
+    LlmAnswerer(llm).answer("Pergunta?", [make_retrieved(1)])
+    payload = json.loads(requests[0].content)
+    assert (payload["temperature"], payload["seed"]) == (0, 0)
+
+
+def test_empty_settings_from_ci_mean_unset() -> None:
+    settings = Settings(_env_file=None, llm_temperature="", llm_reasoning_effort="")
+
+    assert settings.llm_temperature is None
+    assert settings.llm_reasoning_effort is None
 
 
 def test_timeouts_are_retried_before_failing() -> None:

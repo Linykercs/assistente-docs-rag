@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Effort = Literal["low", "medium", "high", "xhigh", "max"]
@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     llm_model: str = "claude-sonnet-5-5"
     # Only used by the OpenAI-compatible provider, when the model supports it ("low", ...).
     llm_reasoning_effort: str | None = None
+    # Only used by the OpenAI-compatible provider. 0 makes answers repeatable between eval runs.
+    llm_temperature: float | None = None
     # Only used by the Anthropic provider.
     llm_effort: Effort = "low"
     judge_model: str = "claude-sonnet-5-5"
@@ -47,6 +49,12 @@ class Settings(BaseSettings):
     langfuse_public_key: SecretStr | None = None
     langfuse_secret_key: SecretStr | None = None
     langfuse_host: str = "https://cloud.langfuse.com"
+
+    @field_validator("llm_reasoning_effort", "llm_temperature", mode="before")
+    @classmethod
+    def _empty_means_unset(cls, value: object) -> object:
+        # CI passes these as empty strings when they don't apply to the chosen provider.
+        return None if value == "" else value
 
 
 @lru_cache
