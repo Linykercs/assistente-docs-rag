@@ -50,6 +50,8 @@ jobs:
       LLM_PROVIDER: ${{ inputs.provider == 'claude' && 'anthropic' || 'openai_compat' }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       LLM_REASONING_EFFORT: ${{ (inputs.provider == 'groq' || inputs.provider == 'gemini') && 'low' || '' }}
+      # Repeatable answers, so a change in the scores comes from the code, not from sampling.
+      LLM_TEMPERATURE: ${{ inputs.provider != 'claude' && '0' || '' }}
       DEFAULT_MODEL: >-
         ${{ inputs.provider == 'local' && 'qwen2.5:3b'
         || inputs.provider == 'groq' && 'openai/gpt-oss-120b'

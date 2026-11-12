@@ -58,6 +58,7 @@ def open_llm(settings: Settings, *, model: str) -> Iterator[StructuredLlm]:
             api_key=settings.llm_api_key.get_secret_value(),
             model=model,
             reasoning_effort=settings.llm_reasoning_effort,
+            temperature=settings.llm_temperature,
         )
 
 
