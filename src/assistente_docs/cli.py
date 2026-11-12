@@ -8,14 +8,14 @@ from pathlib import Path
 import httpx
 
 from assistente_docs.bootstrap import (
-    build_anthropic_client,
     build_embedder,
     build_store,
+    open_llm,
     open_rag_service,
 )
 from assistente_docs.config import Settings, get_settings
 from assistente_docs.evals.dataset import load_cases
-from assistente_docs.evals.judge import ClaudeJudge
+from assistente_docs.evals.judge import LlmJudge
 from assistente_docs.evals.report import write_report
 from assistente_docs.evals.runner import run_evals
 from assistente_docs.evals.scoring import summarize
@@ -100,11 +100,11 @@ def _ask(settings: Settings, question: str) -> None:
 
 def _eval(settings: Settings, *, dataset: Path, output_dir: Path) -> None:
     cases = load_cases(dataset)
-    judge = ClaudeJudge(
-        build_anthropic_client(settings), model=settings.judge_model, effort=settings.llm_effort
-    )
-    with open_rag_service(settings) as service:
-        results = run_evals(cases, service, judge)
+    with (
+        open_llm(settings, model=settings.judge_model) as judge_llm,
+        open_rag_service(settings) as service,
+    ):
+        results = run_evals(cases, service, LlmJudge(judge_llm))
 
     markdown_path, json_path = write_report(
         results,
