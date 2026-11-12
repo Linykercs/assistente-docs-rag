@@ -15,8 +15,9 @@ dist/
 venv/
 env/
 
-# Testes e cobertura
+# Testes, lint e cobertura
 .pytest_cache/
+.ruff_cache/
 .coverage
 htmlcov/
 
@@ -27,6 +28,10 @@ htmlcov/
 data/raw/
 *.db
 *.sqlite
+
+# Relatórios de evals (gerados a cada execução)
+evals/reports/*
+!evals/reports/.gitkeep
 
 # Editores e sistema
 .vscode/
