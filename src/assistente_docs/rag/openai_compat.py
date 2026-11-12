@@ -1,16 +1,24 @@
 """Structured completions over any OpenAI-compatible chat completions API.
 
-Used with GitHub Models (https://models.github.ai/inference), which offers free,
-rate-limited access with a GitHub token. Other compatible providers work the same way.
+Used with Google Gemini's OpenAI-compatible endpoint, which has a free, rate-limited tier.
+Other compatible providers (Groq, OpenRouter, a local Ollama) work the same way.
 """
 
 import copy
+import time
+from collections.abc import Callable
 from typing import Any
 
 import httpx
 from pydantic import BaseModel, ValidationError
 
 from assistente_docs.rag.llm import Completion, LlmError
+
+# Free tiers limit requests per minute; these statuses mean "try again shortly".
+RETRYABLE_STATUS = frozenset({429, 500, 502, 503})
+MAX_RETRIES = 4
+DEFAULT_RETRY_SECONDS = 15.0
+MAX_RETRY_SECONDS = 60.0
 
 
 def strict_json_schema(output_format: type[BaseModel]) -> dict[str, Any]:
@@ -40,12 +48,30 @@ def _strip_code_fence(text: str) -> str:
     return stripped.strip()
 
 
+def _retry_delay(response: httpx.Response, attempt: int) -> float:
+    """Honor Retry-After when given in seconds; otherwise back off linearly."""
+    try:
+        delay = float(response.headers.get("Retry-After", ""))
+    except ValueError:
+        delay = DEFAULT_RETRY_SECONDS * (attempt + 1)
+    return min(max(delay, 0.0), MAX_RETRY_SECONDS)
+
+
 class OpenAICompatLlm:
-    def __init__(self, client: httpx.Client, *, base_url: str, api_key: str, model: str) -> None:
+    def __init__(
+        self,
+        client: httpx.Client,
+        *,
+        base_url: str,
+        api_key: str,
+        model: str,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
         self._client = client
         self._url = base_url.rstrip("/") + "/chat/completions"
         self._headers = {"Authorization": f"Bearer {api_key}"}
         self._model = model
+        self._sleep = sleep
 
     @property
     def model(self) -> str:
@@ -69,10 +95,7 @@ class OpenAICompatLlm:
                 },
             },
         }
-        try:
-            response = self._client.post(self._url, json=payload, headers=self._headers)
-        except httpx.HTTPError as exc:
-            raise LlmError(f"LLM request failed: {exc}") from exc
+        response = self._post(payload)
         if response.status_code != httpx.codes.OK:
             raise LlmError(f"LLM API returned HTTP {response.status_code}: {response.text[:500]}")
 
@@ -98,3 +121,14 @@ class OpenAICompatLlm:
             input_tokens=int(usage.get("prompt_tokens", 0)),
             output_tokens=int(usage.get("completion_tokens", 0)),
         )
+
+    def _post(self, payload: dict[str, Any]) -> httpx.Response:
+        for attempt in range(MAX_RETRIES + 1):
+            try:
+                response = self._client.post(self._url, json=payload, headers=self._headers)
+            except httpx.HTTPError as exc:
+                raise LlmError(f"LLM request failed: {exc}") from exc
+            if response.status_code not in RETRYABLE_STATUS or attempt == MAX_RETRIES:
+                return response
+            self._sleep(_retry_delay(response, attempt))
+        raise AssertionError("unreachable")
