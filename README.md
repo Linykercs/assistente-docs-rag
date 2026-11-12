@@ -77,7 +77,7 @@ flowchart LR
 | Camada | Tecnologia |
 | --- | --- |
 | API | Python 3.12, FastAPI, Pydantic v2 |
-| LLM | Claude (Anthropic), via SDK oficial, com saída estruturada; alternativa gratuita via GitHub Models |
+| LLM | Claude (Anthropic), via SDK oficial, com saída estruturada; alternativa gratuita via Google Gemini |
 | Embeddings | fastembed (ONNX, local), modelo multilíngue E5 |
 | Banco vetorial | PostgreSQL + pgvector (índice HNSW, distância de cosseno) |
 | Ingestão | httpx, BeautifulSoup, markdownify |
@@ -88,8 +88,8 @@ flowchart LR
 ## Como rodar
 
 Pré-requisitos: [Docker](https://docs.docker.com/get-docker/), [uv](https://docs.astral.sh/uv/)
-e uma chave de API da Anthropic ou um token do GitHub (veja
-[Rodar de graça com o GitHub Models](#rodar-de-graça-com-o-github-models)).
+e uma chave de API da Anthropic ou uma chave gratuita do Gemini (veja
+[Rodar de graça com o Gemini](#rodar-de-graça-com-o-gemini)).
 
 ```bash
 # 1. Configuração
@@ -118,23 +118,25 @@ uv run ruff check .
 Para rodar tudo em containers: `docker compose up --build` sobe o banco e a API, e os comandos
 de CLI rodam com `docker compose run --rm api assistente-docs <comando>`.
 
-### Rodar de graça com o GitHub Models
+### Rodar de graça com o Gemini
 
 O Claude é o LLM padrão, mas o projeto também fala com qualquer API compatível com a da
-OpenAI. O [GitHub Models](https://github.com/marketplace?type=models) tem um plano gratuito,
-com limite diário de requisições, que basta para usar o assistente e rodar as evals.
+OpenAI. O Google Gemini tem um plano gratuito, sem cartão e com limite de requisições, que
+basta para usar o assistente e rodar as evals.
 
-1. Crie um [token fine-grained](https://github.com/settings/personal-access-tokens/new) com a
-   permissão **Models: read**.
+1. Crie uma chave em [Google AI Studio](https://aistudio.google.com/apikey).
 2. No `.env`, troque o bloco do LLM por:
 
    ```bash
    LLM_PROVIDER=openai_compat
-   LLM_BASE_URL=https://models.github.ai/inference
-   LLM_API_KEY=<seu token>
-   LLM_MODEL=openai/gpt-4.1-mini
-   JUDGE_MODEL=openai/gpt-4.1-mini
+   LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+   LLM_API_KEY=<sua chave>
+   LLM_MODEL=gemini-flash-latest
+   JUDGE_MODEL=gemini-flash-latest
    ```
+
+Groq, OpenRouter ou um Ollama local também funcionam: basta trocar `LLM_BASE_URL`, a chave e o
+modelo.
 
 O resto (ingestão, retrieval, citações e evals) não muda: a troca acontece só na camada
 `StructuredLlm` (`rag/llm.py`), que pede a mesma saída estruturada aos dois provedores.
@@ -196,8 +198,8 @@ Casos sem gabarito ainda contam para comportamento e citação; as demais métri
 O workflow [Evals](.github/workflows/evals.yml) roda a suíte completa no GitHub Actions sob
 demanda (`workflow_dispatch`): sobe um Postgres com pgvector, ingere a documentação, executa as
 perguntas e publica o relatório como artifact. Com `provider: claude`, ele usa o secret
-`ANTHROPIC_API_KEY` do repositório; com `provider: github-models`, usa o próprio `GITHUB_TOKEN`
-do workflow e não precisa de nenhum secret.
+`ANTHROPIC_API_KEY` do repositório; com `provider: gemini`, usa o secret
+`LLM_API_KEY` com a chave gratuita do Gemini.
 
 ## Observabilidade
 
@@ -272,7 +274,7 @@ gcloud run deploy assistente-docs-rag \
   referência é descartada por enquanto: é JSON bruto, que piora o retrieval.
 - **Provedor de LLM trocável.** O código de RAG e de evals depende só de uma interface
   (`StructuredLlm`). O Claude é o padrão; o adaptador compatível com OpenAI permite rodar de
-  graça no GitHub Models e comparar modelos com as mesmas evals.
+  graça com o Gemini e comparar modelos com as mesmas evals.
 - **Busca só vetorial.** Simples de entender e de medir. Busca híbrida entra no roadmap se as
   evals mostrarem falhas com termos exatos (nomes de eventos, campos).
 

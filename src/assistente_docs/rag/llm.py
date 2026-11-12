@@ -2,7 +2,7 @@
 
 `StructuredLlm` is the seam between the RAG/eval code and a concrete provider. Two
 implementations exist: `AnthropicLlm` (Claude, the default) and `OpenAICompatLlm`
-(any OpenAI-compatible chat completions API, such as GitHub Models), in `openai_compat.py`.
+(any OpenAI-compatible chat completions API, such as Google Gemini), in `openai_compat.py`.
 """
 
 from collections.abc import Sequence

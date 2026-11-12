@@ -5,19 +5,17 @@ on:
   workflow_dispatch:
     inputs:
       provider:
-        description: "LLM: claude (secret ANTHROPIC_API_KEY) ou github-models (gratuito)"
+        description: "LLM: claude (secret ANTHROPIC_API_KEY) ou gemini (gratuito, secret LLM_API_KEY)"
         type: choice
-        options: [claude, github-models]
+        options: [claude, gemini]
         default: claude
       model:
-        description: "Modelo do GitHub Models (só para github-models)"
+        description: "Modelo do Gemini (só para gemini)"
         type: string
-        default: openai/gpt-4.1-mini
+        default: gemini-flash-latest
 
-# GitHub Models authenticates with the workflow's own GITHUB_TOKEN.
 permissions:
   contents: read
-  models: read
 
 jobs:
   evals:
@@ -40,11 +38,11 @@ jobs:
           --health-retries 10
 
     env:
-      LLM_PROVIDER: ${{ inputs.provider == 'github-models' && 'openai_compat' || 'anthropic' }}
+      LLM_PROVIDER: ${{ inputs.provider == 'gemini' && 'openai_compat' || 'anthropic' }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      LLM_API_KEY: ${{ secrets.GITHUB_TOKEN }}
-      LLM_MODEL: ${{ inputs.provider == 'github-models' && inputs.model || 'claude-sonnet-5-5' }}
-      JUDGE_MODEL: ${{ inputs.provider == 'github-models' && inputs.model || 'claude-sonnet-5-5' }}
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      LLM_MODEL: ${{ inputs.provider == 'gemini' && inputs.model || 'claude-sonnet-5-5' }}
+      JUDGE_MODEL: ${{ inputs.provider == 'gemini' && inputs.model || 'claude-sonnet-5-5' }}
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/assistente_docs
       FASTEMBED_CACHE_PATH: ${{ github.workspace }}/.fastembed
 

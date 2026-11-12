@@ -17,10 +17,10 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://postgres:postgres@localhost:5432/assistente_docs"
 
     # "anthropic" uses Claude. "openai_compat" uses any OpenAI-compatible API, such as
-    # GitHub Models (free tier, authenticated with a GitHub token).
+    # Google Gemini, which has a free tier.
     llm_provider: LlmProvider = "anthropic"
     anthropic_api_key: SecretStr | None = None
-    llm_base_url: str = "https://models.github.ai/inference"
+    llm_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"
     llm_api_key: SecretStr | None = None
     llm_model: str = "claude-sonnet-5-5"
     # Only used by the Anthropic provider.
