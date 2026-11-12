@@ -9,6 +9,7 @@ from assistente_docs.evals.report import write_report
 from assistente_docs.evals.runner import run_evals
 from assistente_docs.evals.scoring import normalize_url, score_case, summarize
 from assistente_docs.models import AnswerStatus, RagAnswer, Source
+from assistente_docs.rag.llm import LlmError
 from fakes import FakeAskService, make_retrieved
 
 DATASET = Path(__file__).parents[1] / "evals" / "perguntas.yaml"
@@ -156,7 +157,9 @@ def test_runner_only_calls_the_judge_for_cases_with_a_reference_answer() -> None
     cases = [
         make_case(),
         make_case(resposta_esperada="Use access_token."),
-        make_case(categoria="fora_do_recorte", resposta_esperada="Deve recusar.", tem_resposta=False),
+        make_case(
+            categoria="fora_do_recorte", resposta_esperada="Deve recusar.", tem_resposta=False
+        ),
     ]
     service = FakeAskService(make_answer())
     judge = FakeJudge()
@@ -166,6 +169,15 @@ def test_runner_only_calls_the_judge_for_cases_with_a_reference_answer() -> None
     assert len(service.questions) == 3
     assert len(judge.graded) == 1
     assert [result.correct for result in results] == [None, True, None]
+
+
+def test_run_evals_skips_cases_whose_llm_call_fails() -> None:
+    service = FakeAskService(LlmError("timeout"))
+
+    results = run_evals([make_case(), make_case()], service, FakeJudge())
+
+    assert results == []
+    assert len(service.questions) == 2
 
 
 def test_report_is_written_as_markdown_and_json(tmp_path: Path) -> None:
