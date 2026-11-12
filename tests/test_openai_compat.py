@@ -32,7 +32,9 @@ def chat_response(content: str | None, **message: object) -> dict:
     }
 
 
-def make_llm(handler) -> tuple[OpenAICompatLlm, list[httpx.Request]]:
+def make_llm(
+    handler, *, reasoning_effort: str | None = None
+) -> tuple[OpenAICompatLlm, list[httpx.Request]]:
     requests: list[httpx.Request] = []
 
     def record(request: httpx.Request) -> httpx.Response:
@@ -45,6 +47,7 @@ def make_llm(handler) -> tuple[OpenAICompatLlm, list[httpx.Request]]:
         base_url=BASE_URL + "/",
         api_key="token-123",
         model="openai/x",
+        reasoning_effort=reasoning_effort,
         sleep=SLEEPS.append,
     )
     return llm, requests
@@ -127,6 +130,44 @@ def test_rate_limits_give_up_after_the_last_retry() -> None:
     with pytest.raises(LlmError, match="HTTP 429"):
         LlmAnswerer(llm).answer("Pergunta?", [make_retrieved(1)])
     assert len(requests) == 5
+
+
+def test_reasoning_effort_is_sent_only_when_configured() -> None:
+    draft = json.dumps({"status": "answered", "answer": "Ok [1].", "cited_ids": [1]})
+
+    def ok(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=chat_response(draft))
+
+    for effort in (None, "low"):
+        llm, requests = make_llm(ok, reasoning_effort=effort)
+        LlmAnswerer(llm).answer("Pergunta?", [make_retrieved(1)])
+        assert json.loads(requests[0].content).get("reasoning_effort") == effort
+
+
+def test_timeouts_are_retried_before_failing() -> None:
+    draft = json.dumps({"status": "answered", "answer": "Ok [1].", "cited_ids": [1]})
+    attempts = []
+
+    def slow_then_ok(request: httpx.Request) -> httpx.Response:
+        attempts.append(request)
+        if len(attempts) == 1:
+            raise httpx.ReadTimeout("demorou", request=request)
+        return httpx.Response(200, json=chat_response(draft))
+
+    llm, _ = make_llm(slow_then_ok)
+
+    assert LlmAnswerer(llm).answer("Pergunta?", [make_retrieved(1)]).output.answer == "Ok [1]."
+    assert len(attempts) == 2
+
+
+def test_timeouts_give_up_after_the_last_retry() -> None:
+    def always_slow(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("demorou", request=request)
+
+    llm, _ = make_llm(always_slow)
+
+    with pytest.raises(LlmError, match="timed out"):
+        LlmAnswerer(llm).answer("Pergunta?", [make_retrieved(1)])
 
 
 def test_network_errors_become_llm_errors() -> None:

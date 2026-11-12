@@ -65,12 +65,14 @@ class OpenAICompatLlm:
         base_url: str,
         api_key: str,
         model: str,
+        reasoning_effort: str | None = None,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self._client = client
         self._url = base_url.rstrip("/") + "/chat/completions"
         self._headers = {"Authorization": f"Bearer {api_key}"}
         self._model = model
+        self._reasoning_effort = reasoning_effort
         self._sleep = sleep
 
     @property
@@ -80,7 +82,7 @@ class OpenAICompatLlm:
     def complete[T: BaseModel](
         self, *, system: str, user: str, output_format: type[T]
     ) -> Completion[T]:
-        payload = {
+        payload: dict[str, Any] = {
             "model": self._model,
             "messages": [
                 {"role": "system", "content": system},
@@ -95,6 +97,8 @@ class OpenAICompatLlm:
                 },
             },
         }
+        if self._reasoning_effort:
+            payload["reasoning_effort"] = self._reasoning_effort
         response = self._post(payload)
         if response.status_code != httpx.codes.OK:
             raise LlmError(f"LLM API returned HTTP {response.status_code}: {response.text[:500]}")
@@ -126,6 +130,12 @@ class OpenAICompatLlm:
         for attempt in range(MAX_RETRIES + 1):
             try:
                 response = self._client.post(self._url, json=payload, headers=self._headers)
+            except httpx.TimeoutException as exc:
+                # Overloaded free tiers sometimes hang instead of answering 503.
+                if attempt == MAX_RETRIES:
+                    raise LlmError(f"LLM request timed out: {exc}") from exc
+                self._sleep(DEFAULT_RETRY_SECONDS * (attempt + 1))
+                continue
             except httpx.HTTPError as exc:
                 raise LlmError(f"LLM request failed: {exc}") from exc
             if response.status_code not in RETRYABLE_STATUS or attempt == MAX_RETRIES:
