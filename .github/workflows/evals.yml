@@ -5,10 +5,10 @@ on:
   workflow_dispatch:
     inputs:
       provider:
-        description: "LLM: claude (ANTHROPIC_API_KEY), groq (GROQ_API_KEY) ou gemini (LLM_API_KEY)"
+        description: "LLM: local (gratuito, sem chave), claude, groq ou gemini"
         type: choice
-        options: [claude, groq, gemini]
-        default: groq
+        options: [local, claude, groq, gemini]
+        default: local
       model:
         description: "Modelo (vazio = padrão do provedor)"
         type: string
@@ -37,12 +37,22 @@ jobs:
           --health-timeout 3s
           --health-retries 10
 
+      # Open model served on the runner itself: no account, key or quota. Idle for other providers.
+      ollama:
+        image: ollama/ollama:latest
+        env:
+          # The prompt carries ~6 documentation chunks; the default context would truncate it.
+          OLLAMA_CONTEXT_LENGTH: "8192"
+        ports:
+          - 11434:11434
+
     env:
       LLM_PROVIDER: ${{ inputs.provider == 'claude' && 'anthropic' || 'openai_compat' }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      LLM_REASONING_EFFORT: ${{ inputs.provider != 'claude' && 'low' || '' }}
+      LLM_REASONING_EFFORT: ${{ (inputs.provider == 'groq' || inputs.provider == 'gemini') && 'low' || '' }}
       DEFAULT_MODEL: >-
-        ${{ inputs.provider == 'groq' && 'openai/gpt-oss-120b'
+        ${{ inputs.provider == 'local' && 'qwen2.5:3b'
+        || inputs.provider == 'groq' && 'openai/gpt-oss-120b'
         || inputs.provider == 'gemini' && 'gemini-flash-latest'
         || 'claude-sonnet-5-5' }}
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/assistente_docs
@@ -69,6 +79,9 @@ jobs:
           echo "LLM_MODEL=$model" >> "$GITHUB_ENV"
           echo "JUDGE_MODEL=$model" >> "$GITHUB_ENV"
           case "$PROVIDER" in
+            local)
+              echo "LLM_BASE_URL=http://localhost:11434/v1" >> "$GITHUB_ENV"
+              echo "LLM_API_KEY=ollama" >> "$GITHUB_ENV" ;;
             groq)
               echo "LLM_BASE_URL=https://api.groq.com/openai/v1" >> "$GITHUB_ENV"
               echo "LLM_API_KEY=$GROQ_API_KEY" >> "$GITHUB_ENV" ;;
@@ -76,6 +89,12 @@ jobs:
               echo "LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai" >> "$GITHUB_ENV"
               echo "LLM_API_KEY=$GEMINI_API_KEY" >> "$GITHUB_ENV" ;;
           esac
+
+      - name: Download local model
+        if: inputs.provider == 'local'
+        run: |
+          for i in $(seq 1 30); do curl -sf http://localhost:11434/api/version && break; sleep 2; done
+          curl -sSf http://localhost:11434/api/pull -d "{\"model\": \"$LLM_MODEL\", \"stream\": false}"
 
       - name: Cache embedding model
         uses: actions/cache@v4
