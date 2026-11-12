@@ -35,7 +35,7 @@ def build_anthropic_client(settings: Settings) -> anthropic.Anthropic:
 
 
 # Free tiers can be slow under load; a full answer still fits well within this.
-OPENAI_COMPAT_TIMEOUT_SECONDS = 120.0
+OPENAI_COMPAT_TIMEOUT_SECONDS = 180.0
 
 
 @contextmanager
@@ -58,6 +58,7 @@ def open_llm(settings: Settings, *, model: str) -> Iterator[StructuredLlm]:
             base_url=settings.llm_base_url,
             api_key=settings.llm_api_key.get_secret_value(),
             model=model,
+            reasoning_effort=settings.llm_reasoning_effort,
         )
 
 

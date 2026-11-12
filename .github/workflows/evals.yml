@@ -43,6 +43,7 @@ jobs:
       LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
       LLM_MODEL: ${{ inputs.provider == 'gemini' && inputs.model || 'claude-sonnet-5-5' }}
       JUDGE_MODEL: ${{ inputs.provider == 'gemini' && inputs.model || 'claude-sonnet-5-5' }}
+      LLM_REASONING_EFFORT: ${{ inputs.provider == 'gemini' && 'low' || '' }}
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/assistente_docs
       FASTEMBED_CACHE_PATH: ${{ github.workspace }}/.fastembed
 

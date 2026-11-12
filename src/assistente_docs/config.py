@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"
     llm_api_key: SecretStr | None = None
     llm_model: str = "claude-sonnet-5-5"
+    # Only used by the OpenAI-compatible provider, when the model supports it ("low", ...).
+    llm_reasoning_effort: str | None = None
     # Only used by the Anthropic provider.
     llm_effort: Effort = "low"
     judge_model: str = "claude-sonnet-5-5"
