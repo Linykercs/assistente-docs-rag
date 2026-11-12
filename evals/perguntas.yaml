@@ -10,70 +10,70 @@
 - id: 1
   categoria: autenticacao
   pergunta: "Como eu me autentico na API? Onde vai a chave de API?"
-  resposta_esperada: ""
+  resposta_esperada: "Envie a chave de API no header `access_token` de todas as requisições autenticadas. Envie também o `User-Agent` (obrigatório para contas criadas a partir de 13/06/2024) e `Content-Type: application/json`. Sem chave, com chave inválida ou de outro ambiente, a API retorna 401."
   fonte: "https://docs.asaas.com/docs/autenticação-1"
   tem_resposta: true
 
 - id: 2
   categoria: autenticacao
   pergunta: "Qual a diferença entre o ambiente de sandbox e o de produção, e quais são as URLs de cada um?"
-  resposta_esperada: ""
+  resposta_esperada: "O Sandbox é o ambiente de testes, sem movimentar valores reais; Produção é o ambiente real. A URL base do Sandbox é https://api-sandbox.asaas.com/v3 e a de Produção é https://api.asaas.com/v3. Contas, dados e chaves de API não são compartilhados: é preciso criar uma conta Sandbox separada e usar a chave de cada ambiente na URL correspondente."
   fonte: "https://docs.asaas.com/docs/sandbox"
   tem_resposta: true
 
 - id: 3
   categoria: cobrancas
   pergunta: "Como crio uma cobrança via Pix?"
-  resposta_esperada: ""
+  resposta_esperada: "Crie a cobrança com `billingType` igual a `PIX`, informando `customer`, `value` e `dueDate`. Depois, com o ID da cobrança, chame `GET /v3/payments/{id}/pixQrCode` para obter a imagem do QR Code (`encodedImage`), o código copia e cola (`payload`) e a data de expiração. Recomenda-se ter uma chave Pix cadastrada na conta."
   fonte: "https://docs.asaas.com/docs/cobrancas-via-pix"
   tem_resposta: true
 
 - id: 4
   categoria: cobrancas
   pergunta: "Como crio um boleto com vencimento e multa por atraso?"
-  resposta_esperada: ""
+  resposta_esperada: "Crie a cobrança em `POST /v3/payments` com `billingType` igual a `BOLETO`, `customer`, `value` e a data de vencimento em `dueDate`. Juros e multa devem ser informados na criação, nos objetos `interest` (ex.: `{\"value\": 1}` para 1%) e `fine` (ex.: `{\"value\": 2}` para 2%)."
   fonte: "https://docs.asaas.com/docs/cobrancas-via-boleto"
   tem_resposta: true
 
 - id: 5
   categoria: cobrancas
   pergunta: "Preciso cadastrar o cliente antes de criar uma cobrança?"
-  resposta_esperada: ""
+  resposta_esperada: "Sim. Antes de criar a cobrança, cadastre o cliente (pagador) e armazene o ID retornado, que é enviado no campo `customer` da cobrança. O Asaas permite clientes duplicados, então reutilize o ID já armazenado ou consulte os clientes existentes antes de criar outro."
   fonte: "https://docs.asaas.com/docs/guia-de-cobrancas"
   tem_resposta: true
 
 - id: 6
   categoria: webhooks
   pergunta: "Como configuro um webhook para saber quando um pagamento foi confirmado?"
-  resposta_esperada: ""
+  resposta_esperada: "Na aplicação Asaas, acesse Menu do usuário > Integrações > Webhooks e clique em Criar Webhook. Informe a URL pública do seu endpoint (que recebe POST), e-mail, token de autenticação e tipo de envio, e selecione os eventos de cobrança, como `PAYMENT_CONFIRMED` (pagamento efetuado) e `PAYMENT_RECEIVED` (valor disponível na conta). O endpoint deve responder HTTP 200 após persistir o evento."
   fonte: "https://docs.asaas.com/docs/criar-novo-webhook-pela-aplicacao-web"
   tem_resposta: true
 
 - id: 7
   categoria: webhooks
   pergunta: "Quais eventos de webhook existem para cobranças?"
-  resposta_esperada: ""
+  resposta_esperada: "Há eventos para o ciclo da cobrança (como `PAYMENT_CREATED`, `PAYMENT_UPDATED`, `PAYMENT_CONFIRMED`, `PAYMENT_RECEIVED`, `PAYMENT_OVERDUE`, `PAYMENT_DELETED` e `PAYMENT_RESTORED`), para estornos e chargebacks (como `PAYMENT_REFUNDED`, `PAYMENT_PARTIALLY_REFUNDED` e `PAYMENT_CHARGEBACK_REQUESTED`) e para boleto, negativação e visualização (como `PAYMENT_BANK_SLIP_VIEWED` e `PAYMENT_DUNNING_REQUESTED`)."
   fonte: "https://docs.asaas.com/docs/webhook-para-cobrancas"
   tem_resposta: true
 
 - id: 8
   categoria: webhooks
   pergunta: "O que acontece se o meu endpoint de webhook ficar fora do ar?"
-  resposta_esperada: ""
+  resposta_esperada: "O Asaas faz novas tentativas de entrega. Após 15 falhas consecutivas, a fila do Webhook pode ser interrompida: os eventos continuam sendo gerados, mas deixam de ser enviados até a fila ser reativada. Os eventos ficam guardados por 14 dias e os que passarem disso parados na fila são excluídos permanentemente; o Asaas avisa por e-mail quando há problema de comunicação."
   fonte: "https://docs.asaas.com/docs/sobre-os-webhooks"
   tem_resposta: true
 
 - id: 9
   categoria: webhooks
   pergunta: "Como valido que um webhook veio mesmo do Asaas?"
-  resposta_esperada: ""
+  resposta_esperada: "Defina um token de autenticação na configuração do Webhook. O Asaas envia esse valor em todas as notificações no header `asaas-access-token`; valide esse header antes de processar o evento. Não use uma API Key do Asaas como token."
   fonte: "https://docs.asaas.com/docs/sobre-os-webhooks"
   tem_resposta: true
 
 - id: 10
   categoria: cobrancas
   pergunta: "Como estorno ou cancelo uma cobrança?"
-  resposta_esperada: ""
+  resposta_esperada: "Para devolver o dinheiro, use o estorno: cobranças pagas por cartão de crédito ou Pix podem ser estornadas total ou parcialmente (o estorno é integral se nenhum valor for informado). Para cancelar uma cobrança que não deve mais ficar disponível para pagamento, exclua (remova) a cobrança; a remoção não é estorno e não devolve valores já pagos."
   fonte: "https://docs.asaas.com/reference/estornar-cobranca"
   tem_resposta: true
 
