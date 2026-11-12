@@ -204,7 +204,7 @@ a resposta esperada, a página onde a resposta está e se a documentação respo
 | **Comportamento** | O assistente fez o que devia: respondeu, recusou (`tem_resposta: false`) ou pediu contexto (categoria `ambigua`) | Sempre |
 | **Citação** | Toda resposta dada cita ao menos uma fonte recuperada | Quando o assistente responde |
 | **Retrieval hit** | A página esperada (`fonte`) está entre os chunks recuperados | Quando `fonte` está preenchida |
-| **Corretude** | Um LLM juiz compara a resposta com a `resposta_esperada` escrita por uma pessoa | Quando `resposta_esperada` está preenchida |
+| **Corretude** | Um LLM juiz compara a resposta com a `resposta_esperada`, escrita a partir da página indicada em `fonte` | Quando `resposta_esperada` está preenchida |
 
 Casos sem gabarito ainda contam para comportamento e citação; as demais métricas ficam como
 `n/a` e não entram na taxa. O relatório sai em Markdown e JSON em `evals/reports/`.
@@ -215,6 +215,36 @@ perguntas e publica o relatório como artifact. O provedor é escolhido ao dispa
 workflow: `local` (padrão) roda um modelo aberto com o Ollama no próprio runner, sem chave
 nem cota; `claude` usa o secret `ANTHROPIC_API_KEY`, `groq` usa `GROQ_API_KEY` e `gemini` usa
 `LLM_API_KEY`.
+
+### Resultados
+
+Primeira rodada de melhoria guiada pelas evals, com o modelo aberto `qwen2.5:3b` (Ollama, CPU)
+gerando as respostas e atuando como juiz, temperatura 0 e as mesmas 12 perguntas:
+
+| Métrica | Antes | Depois |
+| --- | --- | --- |
+| Retrieval hit | 10/10 | 10/10 |
+| Comportamento | 6/12 | **11/12** |
+| Citação | 4/4 | **9/9** |
+| Corretude | 2/10 | 3/10 |
+
+- **Problema encontrado:** na linha de base, o assistente pedia esclarecimento em 6 das 10
+  perguntas que a documentação responde. A regra do prompt dava como exemplo detalhes (forma de
+  pagamento, ambiente, Webhook) que cabem em quase qualquer pergunta sobre pagamentos.
+- **Mudança:** responder passou a ser o caso padrão, cobrindo os cenários quando a resposta
+  varia; o pedido de esclarecimento ficou reservado para perguntas que não dizem de qual recurso
+  tratam. Os exemplos do prompt não repetem perguntas do conjunto de avaliação.
+- **Resultado:** o assistente passou a responder 9 de 10 perguntas respondíveis, sem perder os
+  casos de borda: continua recusando o que está fora da documentação e pedindo contexto na
+  pergunta ambígua.
+- **Ruído de medição:** antes de comparar, duas execuções idênticas deram 5/12 e 8/12 em
+  comportamento. Com temperatura 0 e seed fixa, a diferença entre as rodadas reflete a mudança
+  no código, não a amostragem.
+- **Próximo gargalo:** corretude. Um modelo de 3B gera e julga as respostas; o passo seguinte é
+  medir modelos maiores com a mesma suíte.
+
+Execuções: [antes](https://github.com/Linykercs/assistente-docs-rag/actions/runs/43313365653) ·
+[depois](https://github.com/Linykercs/assistente-docs-rag/actions/runs/43320325472).
 
 ## Observabilidade
 
@@ -295,9 +325,9 @@ gcloud run deploy assistente-docs-rag \
 
 ## Status
 
-Em construção — semana 1 de 12. A base do código já existe: ingestão, banco vetorial, API,
-evals, testes e CI. Os próximos passos são preencher o gabarito das evals, medir a primeira
-linha de base e publicar o deploy.
+Em construção. A base do código já existe (ingestão, banco vetorial, API, evals, testes e CI),
+o gabarito das evals está preenchido e a primeira rodada de melhoria está medida em
+[Resultados](#resultados). Os próximos passos são comparar modelos maiores e publicar o deploy.
 
 ## Roadmap
 
@@ -308,7 +338,9 @@ linha de base e publicar o deploy.
 - [x] API (`POST /ask`, `GET /health`) e CLI
 - [x] Runner de evals com relatório em Markdown e JSON
 - [x] Testes unitários, CI e workflow de evals
-- [ ] Gabarito das evals preenchido e primeira linha de base
+- [x] Gabarito das evals preenchido e primeira linha de base
+- [x] Primeira melhoria de prompt medida pelas evals
+- [ ] Comparação entre modelos com a mesma suíte
 - [ ] Deploy público no Cloud Run
 - [ ] Parâmetros da referência da API (OpenAPI) indexados de forma estruturada
 - [ ] Busca híbrida (vetorial + full-text do Postgres)
