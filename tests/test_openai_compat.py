@@ -6,8 +6,8 @@ import pytest
 from assistente_docs.bootstrap import open_llm
 from assistente_docs.config import Settings
 from assistente_docs.evals.judge import JudgeVerdict, LlmJudge
-from assistente_docs.rag.llm import AnthropicLlm, LlmAnswerer, LlmError
-from assistente_docs.rag.openai_compat import OpenAICompatLlm, strict_json_schema
+from assistente_docs.rag.llm import AnthropicLlm, LlmAnswerer, LlmError, QuotaExhaustedError
+from assistente_docs.rag.openai_compat import MAX_RETRIES, OpenAICompatLlm, strict_json_schema
 from assistente_docs.rag.prompt import AnswerDraft
 from fakes import make_retrieved
 
@@ -129,7 +129,24 @@ def test_rate_limits_give_up_after_the_last_retry() -> None:
 
     with pytest.raises(LlmError, match="HTTP 429"):
         LlmAnswerer(llm).answer("Pergunta?", [make_retrieved(1)])
-    assert len(requests) == 5
+    assert len(requests) == MAX_RETRIES + 1
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Quota exceeded: Generate content requests per day limit exceeded on Free Tier.",
+        "Rate limit reached for model on tokens per day (TPD): Limit 200000.",
+        "Rate limit reached on requests per day (RPD): Limit 1000, Used 1000.",
+    ],
+)
+def test_daily_quota_is_not_retried(message: str) -> None:
+    llm, requests = make_llm(lambda _: httpx.Response(429, text=message))
+
+    with pytest.raises(QuotaExhaustedError, match="Cota diária"):
+        LlmAnswerer(llm).answer("Pergunta?", [make_retrieved(1)])
+    assert len(requests) == 1
+    assert SLEEPS == []
 
 
 def test_reasoning_effort_is_sent_only_when_configured() -> None:
