@@ -11,6 +11,11 @@ Você pergunta em português ("Como crio uma cobrança via Pix?") e recebe uma r
 usada. Quando a documentação não cobre o assunto, o assistente diz que não sabe; quando a
 pergunta é ambígua, ele pede mais contexto em vez de chutar.
 
+![Demonstração: pergunta sobre cobrança via Pix e resposta com as fontes](docs/demo.gif)
+
+<sub>Saída real do `assistente-docs ask` com o modelo aberto `qwen2.5:3b` rodando localmente
+(Ollama, CPU). A digitação é simulada e a espera foi encurtada: a resposta levou cerca de 90 s.</sub>
+
 O projeto cobre o ciclo completo de um app de IA em produção:
 
 **extração → chunking → embeddings → banco vetorial → respostas com fonte → evals → deploy**
