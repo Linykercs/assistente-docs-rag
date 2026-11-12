@@ -1,10 +1,11 @@
 """Structured completions over any OpenAI-compatible chat completions API.
 
-Used with Google Gemini's OpenAI-compatible endpoint, which has a free, rate-limited tier.
-Other compatible providers (Groq, OpenRouter, a local Ollama) work the same way.
+Used with the free tiers of Groq and Google Gemini, both OpenAI-compatible. Other compatible
+providers (OpenRouter, a local Ollama) work the same way.
 """
 
 import copy
+import re
 import time
 from collections.abc import Callable
 from typing import Any
@@ -12,11 +13,13 @@ from typing import Any
 import httpx
 from pydantic import BaseModel, ValidationError
 
-from assistente_docs.rag.llm import Completion, LlmError
+from assistente_docs.rag.llm import Completion, LlmError, QuotaExhaustedError
 
 # Free tiers limit requests per minute; these statuses mean "try again shortly".
 RETRYABLE_STATUS = frozenset({429, 500, 502, 503})
-MAX_RETRIES = 4
+MAX_RETRIES = 3
+# A 429 for a *daily* quota won't clear by waiting a minute, so it is not retried.
+DAILY_QUOTA_PATTERN = re.compile(r"per day|perday|\bRPD\b|daily", re.IGNORECASE)
 DEFAULT_RETRY_SECONDS = 15.0
 MAX_RETRY_SECONDS = 60.0
 
@@ -138,6 +141,10 @@ class OpenAICompatLlm:
                 continue
             except httpx.HTTPError as exc:
                 raise LlmError(f"LLM request failed: {exc}") from exc
+            if response.status_code == 429 and DAILY_QUOTA_PATTERN.search(response.text):
+                raise QuotaExhaustedError(
+                    f"Cota diária do LLM esgotada (HTTP 429): {response.text[:300]}"
+                )
             if response.status_code not in RETRYABLE_STATUS or attempt == MAX_RETRIES:
                 return response
             self._sleep(_retry_delay(response, attempt))

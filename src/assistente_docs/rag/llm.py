@@ -24,6 +24,10 @@ class LlmError(RuntimeError):
     """The LLM call failed or returned something unusable."""
 
 
+class QuotaExhaustedError(LlmError):
+    """The provider's daily quota is used up: every further call will fail until it resets."""
+
+
 @dataclass(frozen=True)
 class Completion[T: BaseModel]:
     output: T

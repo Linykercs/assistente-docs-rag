@@ -9,7 +9,7 @@ from assistente_docs.evals.report import write_report
 from assistente_docs.evals.runner import run_evals
 from assistente_docs.evals.scoring import normalize_url, score_case, summarize
 from assistente_docs.models import AnswerStatus, RagAnswer, Source
-from assistente_docs.rag.llm import LlmError
+from assistente_docs.rag.llm import LlmError, QuotaExhaustedError
 from fakes import FakeAskService, make_retrieved
 
 DATASET = Path(__file__).parents[1] / "evals" / "perguntas.yaml"
@@ -178,6 +178,15 @@ def test_run_evals_skips_cases_whose_llm_call_fails() -> None:
 
     assert results == []
     assert len(service.questions) == 2
+
+
+def test_run_evals_stops_when_the_daily_quota_is_exhausted() -> None:
+    service = FakeAskService(QuotaExhaustedError("cota"))
+
+    results = run_evals([make_case(), make_case(), make_case()], service, FakeJudge())
+
+    assert results == []
+    assert len(service.questions) == 1
 
 
 def test_report_is_written_as_markdown_and_json(tmp_path: Path) -> None:
