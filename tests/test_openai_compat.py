@@ -12,6 +12,12 @@ from assistente_docs.rag.prompt import AnswerDraft
 from fakes import make_retrieved
 
 BASE_URL = "https://models.example.com/inference"
+SLEEPS: list[float] = []
+
+
+@pytest.fixture(autouse=True)
+def _clear_sleeps() -> None:
+    SLEEPS.clear()
 
 
 def chat_response(content: str | None, **message: object) -> dict:
@@ -34,7 +40,13 @@ def make_llm(handler) -> tuple[OpenAICompatLlm, list[httpx.Request]]:
         return handler(request)
 
     client = httpx.Client(transport=httpx.MockTransport(record))
-    llm = OpenAICompatLlm(client, base_url=BASE_URL + "/", api_key="token-123", model="openai/x")
+    llm = OpenAICompatLlm(
+        client,
+        base_url=BASE_URL + "/",
+        api_key="token-123",
+        model="openai/x",
+        sleep=SLEEPS.append,
+    )
     return llm, requests
 
 
@@ -91,6 +103,30 @@ def test_failures_become_llm_errors(response: httpx.Response, message: str) -> N
 
     with pytest.raises(LlmError, match=message):
         LlmAnswerer(llm).answer("Pergunta?", [make_retrieved(1)])
+
+
+def test_rate_limits_are_retried_before_failing() -> None:
+    draft = {"status": "answered", "answer": "Ok [1].", "cited_ids": [1]}
+    responses = [
+        httpx.Response(429, headers={"Retry-After": "7"}, text="quota"),
+        httpx.Response(503, text="busy"),
+        httpx.Response(200, json=chat_response(json.dumps(draft))),
+    ]
+    llm, requests = make_llm(lambda _: responses.pop(0))
+
+    completion = LlmAnswerer(llm).answer("Pergunta?", [make_retrieved(1)])
+
+    assert completion.output.answer == "Ok [1]."
+    assert len(requests) == 3
+    assert SLEEPS == [7.0, 30.0]
+
+
+def test_rate_limits_give_up_after_the_last_retry() -> None:
+    llm, requests = make_llm(lambda _: httpx.Response(429, text="quota"))
+
+    with pytest.raises(LlmError, match="HTTP 429"):
+        LlmAnswerer(llm).answer("Pergunta?", [make_retrieved(1)])
+    assert len(requests) == 5
 
 
 def test_network_errors_become_llm_errors() -> None:

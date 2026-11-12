@@ -50,7 +50,7 @@ def open_llm(settings: Settings, *, model: str) -> Iterator[StructuredLlm]:
     if settings.llm_api_key is None:
         raise RuntimeError(
             "LLM_PROVIDER=openai_compat precisa de LLM_API_KEY "
-            "(no GitHub Models, um token do GitHub com permissão models:read)."
+            "(no Gemini, a chave criada em https://aistudio.google.com/apikey)."
         )
     with httpx.Client(timeout=OPENAI_COMPAT_TIMEOUT_SECONDS) as client:
         yield OpenAICompatLlm(
