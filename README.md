@@ -77,7 +77,7 @@ flowchart LR
 | Camada | Tecnologia |
 | --- | --- |
 | API | Python 3.12, FastAPI, Pydantic v2 |
-| LLM | Claude (Anthropic), via SDK oficial, com saída estruturada |
+| LLM | Claude (Anthropic), via SDK oficial, com saída estruturada; alternativa gratuita via GitHub Models |
 | Embeddings | fastembed (ONNX, local), modelo multilíngue E5 |
 | Banco vetorial | PostgreSQL + pgvector (índice HNSW, distância de cosseno) |
 | Ingestão | httpx, BeautifulSoup, markdownify |
@@ -88,7 +88,8 @@ flowchart LR
 ## Como rodar
 
 Pré-requisitos: [Docker](https://docs.docker.com/get-docker/), [uv](https://docs.astral.sh/uv/)
-e uma chave de API da Anthropic.
+e uma chave de API da Anthropic ou um token do GitHub (veja
+[Rodar de graça com o GitHub Models](#rodar-de-graça-com-o-github-models)).
 
 ```bash
 # 1. Configuração
@@ -116,6 +117,27 @@ uv run ruff check .
 
 Para rodar tudo em containers: `docker compose up --build` sobe o banco e a API, e os comandos
 de CLI rodam com `docker compose run --rm api assistente-docs <comando>`.
+
+### Rodar de graça com o GitHub Models
+
+O Claude é o LLM padrão, mas o projeto também fala com qualquer API compatível com a da
+OpenAI. O [GitHub Models](https://github.com/marketplace?type=models) tem um plano gratuito,
+com limite diário de requisições, que basta para usar o assistente e rodar as evals.
+
+1. Crie um [token fine-grained](https://github.com/settings/personal-access-tokens/new) com a
+   permissão **Models: read**.
+2. No `.env`, troque o bloco do LLM por:
+
+   ```bash
+   LLM_PROVIDER=openai_compat
+   LLM_BASE_URL=https://models.github.ai/inference
+   LLM_API_KEY=<seu token>
+   LLM_MODEL=openai/gpt-4.1-mini
+   JUDGE_MODEL=openai/gpt-4.1-mini
+   ```
+
+O resto (ingestão, retrieval, citações e evals) não muda: a troca acontece só na camada
+`StructuredLlm` (`rag/llm.py`), que pede a mesma saída estruturada aos dois provedores.
 
 ## API
 
@@ -173,8 +195,9 @@ Casos sem gabarito ainda contam para comportamento e citação; as demais métri
 
 O workflow [Evals](.github/workflows/evals.yml) roda a suíte completa no GitHub Actions sob
 demanda (`workflow_dispatch`): sobe um Postgres com pgvector, ingere a documentação, executa as
-perguntas e publica o relatório como artifact. Ele usa o secret `ANTHROPIC_API_KEY` do
-repositório.
+perguntas e publica o relatório como artifact. Com `provider: claude`, ele usa o secret
+`ANTHROPIC_API_KEY` do repositório; com `provider: github-models`, usa o próprio `GITHUB_TOKEN`
+do workflow e não precisa de nenhum secret.
 
 ## Observabilidade
 
@@ -211,7 +234,7 @@ gcloud run deploy assistente-docs-rag \
 ├── src/assistente_docs/
 │   ├── api/                # FastAPI: rotas e schemas
 │   ├── ingestion/          # fetcher, limpeza, chunking e pipeline de ingestão
-│   ├── rag/                # retrieval, prompt, integração com o Claude e serviço RAG
+│   ├── rag/                # retrieval, prompt, provedores de LLM e serviço RAG
 │   ├── evals/              # dataset, juiz, métricas, runner e relatório
 │   ├── db/schema.sql       # schema do pgvector
 │   ├── bootstrap.py        # montagem dos componentes a partir das settings
@@ -247,6 +270,9 @@ gcloud run deploy assistente-docs-rag \
 - **Markdown da própria documentação.** Usar as páginas `.md` evita depender do HTML do site
   e deixa a limpeza simples e testável. A definição OpenAPI embutida nas páginas de
   referência é descartada por enquanto: é JSON bruto, que piora o retrieval.
+- **Provedor de LLM trocável.** O código de RAG e de evals depende só de uma interface
+  (`StructuredLlm`). O Claude é o padrão; o adaptador compatível com OpenAI permite rodar de
+  graça no GitHub Models e comparar modelos com as mesmas evals.
 - **Busca só vetorial.** Simples de entender e de medir. Busca híbrida entra no roadmap se as
   evals mostrarem falhas com termos exatos (nomes de eventos, campos).
 
