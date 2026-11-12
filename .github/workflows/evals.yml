@@ -1,0 +1,65 @@
+name: Evals
+
+# Runs the full pipeline against the real docs and the real LLM, so it is manual only.
+on:
+  workflow_dispatch:
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    services:
+      db:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: assistente_docs
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d assistente_docs"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/assistente_docs
+      FASTEMBED_CACHE_PATH: ${{ github.workspace }}/.fastembed
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Cache embedding model
+        uses: actions/cache@v4
+        with:
+          path: .fastembed
+          key: fastembed-multilingual-e5-large
+
+      - name: Create schema
+        run: uv run assistente-docs init-db
+
+      - name: Ingest documentation
+        run: uv run assistente-docs ingest
+
+      - name: Run evals
+        run: uv run assistente-docs eval
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: |
+            evals/reports/*.md
+            evals/reports/*.json
+          if-no-files-found: warn
