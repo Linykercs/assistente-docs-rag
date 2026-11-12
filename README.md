@@ -121,7 +121,10 @@ de CLI rodam com `docker compose run --rm api assistente-docs <comando>`.
 ### Rodar de graça com Groq ou Gemini
 
 O Claude é o LLM padrão, mas o projeto também fala com qualquer API compatível com a da
-OpenAI. Groq e Google Gemini têm planos gratuitos, sem cartão.
+OpenAI. Groq e Google Gemini têm planos gratuitos, sem cartão. Para rodar sem conta nenhuma,
+use um modelo aberto local com o [Ollama](https://ollama.com) (`LLM_BASE_URL=http://localhost:11434/v1`,
+`LLM_MODEL=qwen2.5:3b`, qualquer valor em `LLM_API_KEY`): é mais lento e responde pior, mas não
+tem limite de uso.
 
 | Provedor | Chave | `LLM_BASE_URL` | `LLM_MODEL` |
 | --- | --- | --- | --- |
@@ -209,7 +212,8 @@ Casos sem gabarito ainda contam para comportamento e citação; as demais métri
 O workflow [Evals](.github/workflows/evals.yml) roda a suíte completa no GitHub Actions sob
 demanda (`workflow_dispatch`): sobe um Postgres com pgvector, ingere a documentação, executa as
 perguntas e publica o relatório como artifact. O provedor é escolhido ao disparar o
-workflow: `claude` usa o secret `ANTHROPIC_API_KEY`, `groq` usa `GROQ_API_KEY` e `gemini` usa
+workflow: `local` (padrão) roda um modelo aberto com o Ollama no próprio runner, sem chave
+nem cota; `claude` usa o secret `ANTHROPIC_API_KEY`, `groq` usa `GROQ_API_KEY` e `gemini` usa
 `LLM_API_KEY`.
 
 ## Observabilidade
