@@ -2,11 +2,9 @@
 
 from typing import Protocol
 
-import anthropic
 from pydantic import BaseModel, Field
 
-from assistente_docs.config import Effort
-from assistente_docs.rag.llm import complete_structured
+from assistente_docs.rag.llm import StructuredLlm
 
 JUDGE_SYSTEM_PROMPT = """\
 Você avalia respostas de um assistente que tira dúvidas sobre a documentação da API do Asaas.
@@ -30,11 +28,13 @@ class Judge(Protocol):
     def grade(self, *, question: str, expected: str, actual: str) -> JudgeVerdict: ...
 
 
-class ClaudeJudge:
-    def __init__(self, client: anthropic.Anthropic, *, model: str, effort: Effort) -> None:
-        self._client = client
-        self._model = model
-        self._effort = effort
+class LlmJudge:
+    def __init__(self, llm: StructuredLlm) -> None:
+        self._llm = llm
+
+    @property
+    def model(self) -> str:
+        return self._llm.model
 
     def grade(self, *, question: str, expected: str, actual: str) -> JudgeVerdict:
         user = (
@@ -42,12 +42,7 @@ class ClaudeJudge:
             f"<resposta_de_referencia>\n{expected}\n</resposta_de_referencia>\n\n"
             f"<resposta_do_assistente>\n{actual}\n</resposta_do_assistente>"
         )
-        completion = complete_structured(
-            self._client,
-            model=self._model,
-            effort=self._effort,
-            system=JUDGE_SYSTEM_PROMPT,
-            user=user,
-            output_format=JudgeVerdict,
+        completion = self._llm.complete(
+            system=JUDGE_SYSTEM_PROMPT, user=user, output_format=JudgeVerdict
         )
         return completion.output

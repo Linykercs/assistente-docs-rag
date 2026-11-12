@@ -3,6 +3,21 @@ name: Evals
 # Runs the full pipeline against the real docs and the real LLM, so it is manual only.
 on:
   workflow_dispatch:
+    inputs:
+      provider:
+        description: "LLM: claude (secret ANTHROPIC_API_KEY) ou github-models (gratuito)"
+        type: choice
+        options: [claude, github-models]
+        default: claude
+      model:
+        description: "Modelo do GitHub Models (só para github-models)"
+        type: string
+        default: openai/gpt-4.1-mini
+
+# GitHub Models authenticates with the workflow's own GITHUB_TOKEN.
+permissions:
+  contents: read
+  models: read
 
 jobs:
   evals:
@@ -25,7 +40,11 @@ jobs:
           --health-retries 10
 
     env:
+      LLM_PROVIDER: ${{ inputs.provider == 'github-models' && 'openai_compat' || 'anthropic' }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      LLM_API_KEY: ${{ secrets.GITHUB_TOKEN }}
+      LLM_MODEL: ${{ inputs.provider == 'github-models' && inputs.model || 'claude-sonnet-5-5' }}
+      JUDGE_MODEL: ${{ inputs.provider == 'github-models' && inputs.model || 'claude-sonnet-5-5' }}
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/assistente_docs
       FASTEMBED_CACHE_PATH: ${{ github.workspace }}/.fastembed
 
