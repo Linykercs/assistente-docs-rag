@@ -238,3 +238,66 @@ def test_open_llm_requires_a_key_for_the_openai_compatible_provider() -> None:
 
     with pytest.raises(RuntimeError, match="LLM_API_KEY"), open_llm(settings, model="openai/x"):
         pass
+
+
+def test_judge_inherits_the_answer_provider_when_not_configured() -> None:
+    settings = Settings(
+        _env_file=None,
+        llm_provider="openai_compat",
+        llm_base_url="http://localhost:11434/v1",
+        llm_api_key="ollama",
+        llm_temperature=0,
+        judge_model="qwen-judge",
+    )
+
+    judge = settings.for_judge()
+
+    assert judge.llm_provider == "openai_compat"
+    assert judge.llm_base_url == "http://localhost:11434/v1"
+    assert judge.llm_api_key is not None
+    assert judge.llm_api_key.get_secret_value() == "ollama"
+    assert judge.llm_temperature == 0
+    assert judge.llm_model == "qwen-judge"
+
+
+def test_judge_can_run_on_another_provider() -> None:
+    settings = Settings(
+        _env_file=None,
+        llm_provider="anthropic",
+        anthropic_api_key="sk-test",
+        judge_provider="openai_compat",
+        judge_base_url="https://api.groq.com/openai/v1",
+        judge_api_key="gsk-test",
+        judge_reasoning_effort="low",
+        judge_temperature=0,
+        judge_model="openai/gpt-oss-120b",
+    )
+
+    judge = settings.for_judge()
+
+    assert judge.llm_provider == "openai_compat"
+    assert judge.llm_base_url == "https://api.groq.com/openai/v1"
+    assert judge.llm_api_key is not None
+    assert judge.llm_api_key.get_secret_value() == "gsk-test"
+    assert (judge.llm_reasoning_effort, judge.llm_temperature) == ("low", 0)
+    # The answers keep their own provider.
+    assert settings.llm_provider == "anthropic"
+    with open_llm(judge, model=settings.judge_model) as llm:
+        assert isinstance(llm, OpenAICompatLlm)
+        assert llm.model == "openai/gpt-oss-120b"
+
+
+def test_empty_judge_settings_from_ci_mean_unset() -> None:
+    settings = Settings(
+        _env_file=None,
+        judge_provider="",
+        judge_base_url="",
+        judge_api_key="",
+        judge_reasoning_effort="",
+        judge_temperature="",
+    )
+
+    judge = settings.for_judge()
+
+    assert judge.llm_provider == settings.llm_provider
+    assert judge.llm_base_url == settings.llm_base_url
