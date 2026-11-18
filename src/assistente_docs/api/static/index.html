@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assistente da API do Asaas</title>
+<meta name="description" content="Demo de um assistente com RAG que responde dúvidas sobre a documentação da API do Asaas citando a fonte.">
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --text: #1d1d1b; --muted: #5f5f5a; --line: #e3e3de;
+    --accent: #0b5cad; --accent-soft: #e8f0fa; --warn: #8a5a00; --warn-soft: #fff4dc;
+    --code: #f0f0ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121212; --card: #1c1c1c; --text: #ececea; --muted: #a3a39d; --line: #2e2e2c;
+      --accent: #7fb4ee; --accent-soft: #1a2a3b; --warn: #f0c36b; --warn-soft: #33290f;
+      --code: #2a2a28;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 1.6rem; margin: 0 0 8px; letter-spacing: -0.01em; }
+  .lead { color: var(--muted); margin: 0 0 24px; }
+  .lead a, .foot a { color: var(--accent); }
+  form { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  label { display: block; font-weight: 600; margin-bottom: 8px; }
+  textarea {
+    width: 100%; min-height: 88px; resize: vertical; padding: 12px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit;
+  }
+  textarea:focus-visible, button:focus-visible, .example:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+  button[type=submit] {
+    background: var(--accent); color: var(--bg); border: 0; border-radius: 8px;
+    padding: 10px 18px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button[disabled] { opacity: .6; cursor: progress; }
+  .examples { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .example {
+    border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 999px;
+    padding: 6px 12px; font: inherit; font-size: .9rem; cursor: pointer;
+  }
+  .example:hover { border-color: var(--accent); }
+  #result { margin-top: 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .status {
+    display: inline-block; font-size: .8rem; font-weight: 600; border-radius: 999px;
+    padding: 2px 10px; margin-bottom: 10px; background: var(--accent-soft); color: var(--accent);
+  }
+  .status.no_answer, .status.needs_clarification, .status.error { background: var(--warn-soft); color: var(--warn); }
+  .answer { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .answer code, .sources code { background: var(--code); border-radius: 4px; padding: 1px 5px; font-size: .92em; }
+  .answer a { color: var(--accent); text-decoration: none; font-weight: 600; }
+  .sources { margin: 16px 0 0; padding: 12px 0 0 20px; border-top: 1px solid var(--line); }
+  .sources li { margin-bottom: 6px; overflow-wrap: anywhere; }
+  .sources a { color: var(--accent); }
+  .muted { color: var(--muted); font-size: .9rem; }
+  .foot { margin-top: 32px; color: var(--muted); font-size: .9rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Assistente da API do Asaas</h1>
+  <p class="lead">
+    Pergunte sobre autenticação, cobranças por Pix, boleto e cartão, clientes e webhooks. A
+    resposta usa só a <a href="https://docs.asaas.com" rel="noopener">documentação pública do Asaas</a>
+    e cita a página de cada afirmação; quando a documentação não cobre o assunto, ele diz que
+    não sabe. É uma demo: o limite é de algumas perguntas por hora.
+  </p>
+
+  <form id="ask-form">
+    <label for="question">Sua pergunta</label>
+    <textarea id="question" name="question" maxlength="1000" required
+      placeholder="Ex.: Como crio uma cobrança via Pix?"></textarea>
+    <div class="row">
+      <button type="submit" id="submit">Perguntar</button>
+      <span class="muted" id="waiting" hidden>Buscando na documentação e escrevendo a resposta…</span>
+    </div>
+    <div class="examples" aria-label="Perguntas de exemplo">
+      <button type="button" class="example">Como crio uma cobrança via Pix?</button>
+      <button type="button" class="example">Como valido que um webhook veio mesmo do Asaas?</button>
+      <button type="button" class="example">Meu webhook parou de receber eventos. O que pode ter acontecido?</button>
+      <button type="button" class="example">Como emito nota fiscal pela API?</button>
+    </div>
+  </form>
+
+  <section id="result" aria-live="polite"></section>
+
+  <p class="foot">
+    Código, arquitetura e as evals que medem cada mudança:
+    <a href="https://github.com/Linykercs/assistente-docs-rag" rel="noopener">github.com/Linykercs/assistente-docs-rag</a>.
+    As perguntas não são guardadas.
+  </p>
+</main>
+
+<script>
+  const form = document.getElementById("ask-form");
+  const question = document.getElementById("question");
+  const submit = document.getElementById("submit");
+  const waiting = document.getElementById("waiting");
+  const result = document.getElementById("result");
+
+  const STATUS_LABEL = {
+    answered: "Respondido com base na documentação",
+    no_answer: "A documentação consultada não cobre isso",
+    needs_clarification: "Preciso de mais contexto",
+    error: "Não deu certo",
+  };
+
+  function escapeHtml(text) {
+    return text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // The answer is escaped first; only `code` spans and [n] citations get markup afterwards.
+  function renderAnswer(text, sources) {
+    const byId = new Map(sources.map((s) => [s.id, s]));
+    return escapeHtml(text)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\[(\d+)\]/g, (match, n) => {
+        const source = byId.get(Number(n));
+        return source ? `<a href="${escapeHtml(source.url)}" rel="noopener" title="${escapeHtml(source.title)}">[${n}]</a>` : match;
+      });
+  }
+
+  function show(status, html) {
+    result.innerHTML = `<div class="card"><span class="status ${status}">${STATUS_LABEL[status] || status}</span>${html}</div>`;
+  }
+
+  for (const button of document.querySelectorAll(".example")) {
+    button.addEventListener("click", () => {
+      question.value = button.textContent;
+      form.requestSubmit();
+    });
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const text = question.value.trim();
+    if (text.length < 3) return;
+    submit.disabled = true;
+    waiting.hidden = false;
+    try {
+      const response = await fetch("ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: text }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const detail = typeof data.detail === "string" ? data.detail : "Tente de novo em instantes.";
+        show("error", `<p class="answer">${escapeHtml(detail)}</p>`);
+        return;
+      }
+      const sources = data.sources || [];
+      const list = sources.length
+        ? `<ol class="sources">${sources.map((s) => `<li value="${s.id}"><a href="${escapeHtml(s.url)}" rel="noopener">${escapeHtml(s.title)}</a>${s.section ? ` <span class="muted">· ${escapeHtml(s.section)}</span>` : ""}</li>`).join("")}</ol>`
+        : "";
+      show(data.status, `<div class="answer">${renderAnswer(data.answer || "", sources)}</div>${list}`);
+    } catch {
+      show("error", `<p class="answer">Sem conexão com o servidor. Tente de novo em instantes.</p>`);
+    } finally {
+      submit.disabled = false;
+      waiting.hidden = true;
+    }
+  });
+</script>
+</body>
+</html>

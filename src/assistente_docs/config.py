@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     # (0 = off; 3 measured as the best), and the size budget of each expansion.
     context_expand_top: int = Field(default=3, ge=0)
     context_group_max_chars: int = Field(default=6000, gt=0)
+
+    # Public demo limits (0 = no limit): questions per visitor per hour, and in total per day.
+    demo_questions_per_hour: int = Field(default=0, ge=0)
+    demo_questions_per_day: int = Field(default=0, ge=0)
     chunk_max_chars: int = Field(default=1500, gt=0)
     chunk_overlap_chars: int = Field(default=200, ge=0)
 
