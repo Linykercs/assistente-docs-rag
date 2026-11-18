@@ -209,6 +209,7 @@ a resposta esperada, a página onde a resposta está e se a documentação respo
 | **Comportamento** | O assistente fez o que devia: respondeu, recusou (`tem_resposta: false`) ou pediu contexto (categoria `ambigua`) | Sempre |
 | **Citação** | Toda resposta dada cita ao menos uma fonte recuperada | Quando o assistente responde |
 | **Retrieval hit** | A página esperada (`fonte`) está entre os chunks recuperados | Quando `fonte` está preenchida |
+| **Context hit** | Os termos esperados (`trechos`) estão no texto dos chunks recuperados. A página pode vir sem o trecho que tem o detalhe | Quando `trechos` está preenchido |
 | **Corretude** | Um LLM juiz compara a resposta com a `resposta_esperada`, escrita a partir da página indicada em `fonte` | Quando `resposta_esperada` está preenchida |
 
 Casos sem gabarito ainda contam para comportamento e citação; as demais métricas ficam como

@@ -13,7 +13,7 @@ from assistente_docs.evals.dataset import EvalCase
 from assistente_docs.evals.judge import JudgeVerdict
 from assistente_docs.models import AnswerStatus, RagAnswer
 
-METRICS = ("behavior_ok", "citation_ok", "retrieval_hit", "correct")
+METRICS = ("behavior_ok", "citation_ok", "retrieval_hit", "context_hit", "correct")
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +32,9 @@ class CaseResult:
     citation_ok: bool | None
     # The expected source page is among the retrieved chunks.
     retrieval_hit: bool | None
+    # Every expected term (`trechos`) is in the text of the retrieved chunks.
+    context_hit: bool | None
+    missing_terms: list[str]
     # The LLM judge considers the answer equivalent to the reference answer.
     correct: bool | None
     judge_reasoning: str | None
@@ -57,6 +60,9 @@ def score_case(case: EvalCase, answer: RagAnswer, verdict: JudgeVerdict | None) 
         expected_url = normalize_url(case.fonte)
         retrieval_hit = any(normalize_url(url) == expected_url for url in retrieved_urls)
 
+    missing_terms = missing_from_context(case.trechos, answer)
+    context_hit = not missing_terms if case.trechos else None
+
     return CaseResult(
         case_id=case.id,
         categoria=case.categoria,
@@ -69,6 +75,8 @@ def score_case(case: EvalCase, answer: RagAnswer, verdict: JudgeVerdict | None) 
         behavior_ok=answer.status == case.expected_status,
         citation_ok=citation_ok,
         retrieval_hit=retrieval_hit,
+        context_hit=context_hit,
+        missing_terms=missing_terms,
         correct=verdict.correct if verdict else None,
         judge_reasoning=verdict.reasoning if verdict else None,
     )
@@ -82,6 +90,12 @@ def summarize(results: Sequence[CaseResult]) -> dict[str, MetricSummary]:
         applicable = [value for value in values if value is not None]
         summary[metric] = MetricSummary(passed=sum(applicable), total=len(applicable))
     return summary
+
+
+def missing_from_context(terms: Sequence[str], answer: RagAnswer) -> list[str]:
+    """Expected terms absent from every retrieved chunk (case-insensitive substring match)."""
+    context = "\n".join(item.chunk.content for item in answer.retrieved).casefold()
+    return [term for term in terms if term.casefold() not in context]
 
 
 def normalize_url(url: str) -> str:

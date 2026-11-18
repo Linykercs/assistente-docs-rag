@@ -12,6 +12,7 @@ _METRIC_LABELS = {
     "behavior_ok": "Comportamento esperado (respondeu / recusou / pediu contexto)",
     "citation_ok": "Resposta com fonte citada",
     "retrieval_hit": "Fonte esperada recuperada (retrieval hit)",
+    "context_hit": "Trechos esperados no contexto (context hit)",
     "correct": "Resposta correta (LLM-as-judge)",
 }
 
@@ -79,17 +80,19 @@ def render_markdown(
         ),
         "",
         "Cada métrica considera só os casos em que ela se aplica: sem `fonte` preenchida não "
-        "há retrieval hit, e sem `resposta_esperada` não há avaliação de corretude.",
+        "há retrieval hit, sem `trechos` não há context hit, e sem `resposta_esperada` não há "
+        "avaliação de corretude.",
         "",
         "## Casos",
         "",
-        "| # | Categoria | Esperado | Obtido | Comportamento | Citação | Retrieval | Corretude |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| # | Categoria | Esperado | Obtido | Comportamento | Citação | Retrieval | Contexto "
+        "| Corretude |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
         *(
             f"| {result.case_id} | {result.categoria} | {result.expected_status} "
             f"| {result.status} | {_format_outcome(result.behavior_ok)} "
             f"| {_format_outcome(result.citation_ok)} | {_format_outcome(result.retrieval_hit)} "
-            f"| {_format_outcome(result.correct)} |"
+            f"| {_format_outcome(result.context_hit)} | {_format_outcome(result.correct)} |"
             for result in results
         ),
         "",
@@ -98,6 +101,9 @@ def render_markdown(
     for result in results:
         lines += ["", f"### {result.case_id}. {result.pergunta}", "", result.answer.strip(), ""]
         lines += [f"- Fonte citada: {url}" for url in result.cited_urls]
+        if result.missing_terms:
+            missing = ", ".join(f"`{term}`" for term in result.missing_terms)
+            lines.append(f"- Fora do contexto recuperado: {missing}")
         if result.judge_reasoning:
             lines.append(f"- Juiz: {result.judge_reasoning}")
     return "\n".join(lines).rstrip() + "\n"
