@@ -56,8 +56,8 @@ class Settings(BaseSettings):
     # Candidates each side contributes before the hybrid merge.
     retrieval_candidates: int = Field(default=30, gt=0)
     # Small-to-big: how many of the best chunks are expanded to their neighbors and section
-    # (0 = off), and the size budget of each expansion.
-    context_expand_top: int = Field(default=0, ge=0)
+    # (0 = off; 3 measured as the best), and the size budget of each expansion.
+    context_expand_top: int = Field(default=3, ge=0)
     context_group_max_chars: int = Field(default=6000, gt=0)
     chunk_max_chars: int = Field(default=1500, gt=0)
     chunk_overlap_chars: int = Field(default=200, ge=0)

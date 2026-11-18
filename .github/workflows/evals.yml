@@ -32,7 +32,7 @@ on:
         options: [vector, hybrid]
         default: vector
       expand_top:
-        description: "Trechos expandidos para vizinhos e seção (0 = desligado)"
+        description: "Trechos expandidos para vizinhos e seção (vazio = padrão do projeto, 3; 0 = desligado)"
         type: string
         default: ""
 
