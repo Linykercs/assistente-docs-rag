@@ -31,6 +31,10 @@ on:
         type: choice
         options: [vector, hybrid]
         default: vector
+      repeat:
+        description: "Quantas vezes rodar a suíte (resumo com média, mínimo e máximo)"
+        type: string
+        default: "1"
       expand_top:
         description: "Trechos expandidos para vizinhos e seção (vazio = padrão do projeto, 3; 0 = desligado)"
         type: string
@@ -42,7 +46,7 @@ permissions:
 jobs:
   evals:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
 
     services:
       db:
@@ -166,7 +170,9 @@ jobs:
         run: uv run assistente-docs ingest
 
       - name: Run evals
-        run: uv run assistente-docs eval
+        env:
+          REPEAT: ${{ inputs.repeat }}
+        run: uv run assistente-docs eval --repeat "${REPEAT:-1}"
 
       - name: Upload report
         if: always()

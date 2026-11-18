@@ -8,7 +8,7 @@ from pathlib import Path
 
 from assistente_docs.evals.scoring import METRICS, CaseResult, MetricSummary, summarize
 
-_METRIC_LABELS = {
+METRIC_LABELS = {
     "behavior_ok": "Comportamento esperado (respondeu / recusou / pediu contexto)",
     "citation_ok": "Resposta com fonte citada",
     "retrieval_hit": "Fonte esperada recuperada (retrieval hit)",
@@ -74,7 +74,7 @@ def render_markdown(
         "| Métrica | Passou | Taxa |",
         "| --- | --- | --- |",
         *(
-            f"| {_METRIC_LABELS[metric]} | {summary[metric].passed}/{summary[metric].total} "
+            f"| {METRIC_LABELS[metric]} | {summary[metric].passed}/{summary[metric].total} "
             f"| {_format_rate(summary[metric].rate)} |"
             for metric in METRICS
         ),

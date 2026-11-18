@@ -14,6 +14,7 @@ from assistente_docs.bootstrap import (
     open_rag_service,
 )
 from assistente_docs.config import Settings, get_settings
+from assistente_docs.evals.aggregate import summarize_runs, write_runs_report
 from assistente_docs.evals.dataset import load_cases
 from assistente_docs.evals.judge import LlmJudge
 from assistente_docs.evals.report import write_report
@@ -41,6 +42,12 @@ def main() -> None:
     eval_parser = commands.add_parser("eval", help="roda a suíte de evals e gera o relatório")
     eval_parser.add_argument("--dataset", type=Path, default=Path("evals/perguntas.yaml"))
     eval_parser.add_argument("--output-dir", type=Path, default=Path("evals/reports"))
+    eval_parser.add_argument(
+        "--repeat",
+        type=int,
+        default=1,
+        help="roda a suíte N vezes e gera também um resumo com média, mínimo e máximo",
+    )
 
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -54,7 +61,7 @@ def main() -> None:
         case "ask":
             _ask(settings, args.question)
         case "eval":
-            _eval(settings, dataset=args.dataset, output_dir=args.output_dir)
+            _eval(settings, dataset=args.dataset, output_dir=args.output_dir, repeat=args.repeat)
 
 
 def _init_db(settings: Settings) -> None:
@@ -98,29 +105,48 @@ def _ask(settings: Settings, question: str) -> None:
         print(f"[{source.id}] {source.title} - {source.url}")
 
 
-def _eval(settings: Settings, *, dataset: Path, output_dir: Path) -> None:
+def _eval(settings: Settings, *, dataset: Path, output_dir: Path, repeat: int = 1) -> None:
+    if repeat < 1:
+        raise SystemExit("--repeat precisa ser 1 ou mais.")
     cases = load_cases(dataset)
+    runs = []
     with (
         open_llm(settings.for_judge(), model=settings.judge_model) as judge_llm,
         open_rag_service(settings) as service,
     ):
-        results = run_evals(cases, service, LlmJudge(judge_llm))
+        for run in range(1, repeat + 1):
+            if repeat > 1:
+                print(f"Execução {run} de {repeat}")
+            results = run_evals(cases, service, LlmJudge(judge_llm))
+            runs.append(results)
+            markdown_path, json_path = write_report(
+                results,
+                output_dir,
+                generated_at=datetime.now(UTC),
+                model=settings.llm_model,
+                judge_model=settings.judge_model,
+            )
+            for metric, item in summarize(results).items():
+                print(f"{metric}: {item.passed}/{item.total}")
+            print(f"Relatório: {markdown_path} e {json_path}")
+            skipped = len(cases) - len(results)
+            if skipped:
+                print(f"{skipped} de {len(cases)} casos pulados por falha do LLM (veja o log).")
 
-    markdown_path, json_path = write_report(
-        results,
-        output_dir,
-        generated_at=datetime.now(UTC),
-        model=settings.llm_model,
-        judge_model=settings.judge_model,
-    )
-    for metric, item in summarize(results).items():
-        print(f"{metric}: {item.passed}/{item.total}")
-    print(f"Relatório: {markdown_path} e {json_path}")
-
-    skipped = len(cases) - len(results)
-    if skipped:
-        print(f"{skipped} de {len(cases)} casos pulados por falha do LLM (veja o log).")
-    if not results:
+    if repeat > 1:
+        markdown_path, json_path = write_runs_report(
+            runs,
+            output_dir,
+            generated_at=datetime.now(UTC),
+            model=settings.llm_model,
+            judge_model=settings.judge_model,
+        )
+        print(f"Resumo das {repeat} execuções:")
+        for metric, item in summarize_runs(runs).items():
+            each = ", ".join(f"{p}/{t}" for p, t in zip(item.passed, item.total, strict=True))
+            print(f"{metric}: {each}")
+        print(f"Resumo: {markdown_path} e {json_path}")
+    if not any(runs):
         raise SystemExit("Nenhum caso foi avaliado.")
 
 
