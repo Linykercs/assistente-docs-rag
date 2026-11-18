@@ -23,7 +23,7 @@ on:
         type: string
         default: ""
       top_k:
-        description: "Trechos recuperados por pergunta (vazio = padrão do projeto, 6)"
+        description: "Trechos recuperados por pergunta (vazio = padrão do projeto, 10)"
         type: string
         default: ""
 

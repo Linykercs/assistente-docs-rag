@@ -274,14 +274,46 @@ dava nota sozinho.
   certa recuperada. O juiz aponta omissões, como os headers `User-Agent` e `Content-Type` na
   autenticação e a chamada `GET /v3/payments/{id}/pixQrCode` no Pix.
 - **Hipótese:** o retrieval hit mede a página, não o trecho. A página entra no contexto, mas o
-  chunk com o detalhe pode ficar fora dos 6 mais próximos. Se for isso, trocar de modelo não
-  resolve; o próximo passo é medir o retrieval por trecho e testar `top_k` maior e busca
-  híbrida.
+  chunk com o detalhe pode ficar fora dos 6 mais próximos. Testada abaixo.
 
 Execuções: [qwen2.5:3b](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44221757445) ·
 [gpt-oss-20b](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44218473254) ·
 [qwen3.8-27b](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44223197754) ·
 [gpt-oss-120b](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44222132909).
+
+#### Contexto por trecho
+
+Para testar a hipótese, cada pergunta com fonte ganhou `trechos`: termos que precisam chegar
+ao modelo para a resposta ser possível (`User-Agent`, `pixQrCode`...), conferidos no texto
+limpo da página. A métrica **context hit** diz se todos estão nos chunks recuperados. Depois,
+só o `top_k` mudou: mesmo modelo (`openai/gpt-oss-20b`), mesmo juiz (`openai/gpt-oss-120b`).
+
+| `top_k` | Retrieval hit | Context hit | Corretude | Comportamento |
+| --- | --- | --- | --- | --- |
+| 6 | 10/10 | 5/10 | 4/10 | 12/12 |
+| **10** | 10/10 | **8/10** | **8/10** | 11/12 |
+| 15 | 10/10 | 8/10 | 9/10 | 11/12 |
+
+- **Hipótese confirmada:** com 6 chunks, a página certa vinha em todas as perguntas, mas o
+  trecho com a resposta só em metade. As perguntas 1, 3, 6 e 7, que falhavam em todos os
+  modelos, estão entre as que não recebiam o trecho.
+- **Resultado:** com 10 chunks a corretude dobra, de 4/10 para 8/10, sem trocar de modelo. Na
+  comparação anterior, trocar o 20B pelo 120B rendeu uma pergunta.
+- **Por que 10 e não 15:** o contexto recuperado é o mesmo (8/10). A pergunta a mais do 15 é a
+  6, que continua sem o trecho esperado, então é variação do modelo, não do retrieval. O
+  padrão do projeto passou de 6 para 10.
+- **Custo:** com mais contexto, a pergunta ambígua ("meu pagamento não apareceu") passou a ser
+  respondida em vez de gerar um pedido de esclarecimento, e a resposta sugeriu um endpoint fora
+  dos trechos. O comportamento caiu de 12/12 para 11/12.
+- **O que falta:** as perguntas 6 e 7 seguem sem o trecho certo. A 7 pede eventos espalhados
+  por três seções da página, e a 6 depende do passo a passo da interface. Busca híbrida e
+  chunks por seção inteira são os próximos testes.
+- **Gabarito:** a resposta esperada da pergunta 6 cita `PAYMENT_CONFIRMED`, que não está na
+  página da fonte (só em outras páginas); o termo ficou fora dos `trechos`.
+
+Execuções: [top_k 6](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44235001930) ·
+[top_k 10](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44235997544) ·
+[top_k 15](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44237238393).
 
 ## Observabilidade
 
@@ -363,9 +395,9 @@ gcloud run deploy assistente-docs-rag \
 ## Status
 
 Em construção. A base do código já existe (ingestão, banco vetorial, API, evals, testes e CI),
-o gabarito das evals está preenchido, e a primeira rodada de melhoria e a comparação entre
-modelos estão medidas em [Resultados](#resultados). Os próximos passos são medir o retrieval
-por trecho, que é o gargalo apontado pela comparação, e publicar o deploy.
+o gabarito das evals está preenchido, e a melhoria de prompt, a comparação entre modelos e o
+ajuste do contexto estão medidos em [Resultados](#resultados). Os próximos passos são busca
+híbrida para as perguntas que ainda não recebem o trecho certo e o deploy público.
 
 ## Roadmap
 
@@ -379,7 +411,7 @@ por trecho, que é o gargalo apontado pela comparação, e publicar o deploy.
 - [x] Gabarito das evals preenchido e primeira linha de base
 - [x] Primeira melhoria de prompt medida pelas evals
 - [x] Comparação entre modelos com a mesma suíte e um juiz fixo
-- [ ] Retrieval medido por trecho, não só por página
+- [x] Retrieval medido por trecho (context hit) e `top_k` ajustado de 6 para 10
 - [ ] Deploy público no Cloud Run
 - [ ] Parâmetros da referência da API (OpenAPI) indexados de forma estruturada
 - [ ] Busca híbrida (vetorial + full-text do Postgres)

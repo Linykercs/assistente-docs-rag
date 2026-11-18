@@ -49,7 +49,8 @@ class Settings(BaseSettings):
     embedding_query_prefix: str = "query: "
     embedding_passage_prefix: str = "passage: "
 
-    retrieval_top_k: int = Field(default=6, gt=0)
+    # 10, not 6: with 6 the chunk holding the answer was missing in half the eval cases.
+    retrieval_top_k: int = Field(default=10, gt=0)
     chunk_max_chars: int = Field(default=1500, gt=0)
     chunk_overlap_chars: int = Field(default=200, ge=0)
 
