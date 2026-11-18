@@ -18,3 +18,10 @@ CREATE INDEX IF NOT EXISTS chunks_source_url_idx ON chunks (source_url);
 
 CREATE INDEX IF NOT EXISTS chunks_embedding_idx
     ON chunks USING hnsw (embedding vector_cosine_ops);
+
+-- Keyword search for the hybrid retrieval mode. Generated from the section heading and the
+-- content, so ingestion doesn't change. The Portuguese config strips stopwords and stems.
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS search_vector tsvector
+    GENERATED ALWAYS AS (to_tsvector('portuguese', heading || ' ' || content)) STORED;
+
+CREATE INDEX IF NOT EXISTS chunks_search_idx ON chunks USING gin (search_vector);

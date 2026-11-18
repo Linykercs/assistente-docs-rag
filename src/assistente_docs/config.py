@@ -51,6 +51,10 @@ class Settings(BaseSettings):
 
     # 10, not 6: with 6 the chunk holding the answer was missing in half the eval cases.
     retrieval_top_k: int = Field(default=10, gt=0)
+    # "hybrid" adds keyword search (Postgres full-text) to the vector search.
+    retrieval_mode: Literal["vector", "hybrid"] = "vector"
+    # Candidates each side contributes before the hybrid merge.
+    retrieval_candidates: int = Field(default=30, gt=0)
     chunk_max_chars: int = Field(default=1500, gt=0)
     chunk_overlap_chars: int = Field(default=200, ge=0)
 

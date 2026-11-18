@@ -26,6 +26,11 @@ on:
         description: "Trechos recuperados por pergunta (vazio = padrão do projeto, 10)"
         type: string
         default: ""
+      retrieval:
+        description: "Busca: vetorial (padrão) ou híbrida (vetorial + full-text do Postgres)"
+        type: choice
+        options: [vector, hybrid]
+        default: vector
 
 permissions:
   contents: read
@@ -92,6 +97,7 @@ jobs:
           JUDGE: ${{ inputs.judge }}
           JUDGE_MODEL_INPUT: ${{ inputs.judge_model }}
           TOP_K: ${{ inputs.top_k }}
+          RETRIEVAL: ${{ inputs.retrieval }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.LLM_API_KEY }}
         run: |
@@ -111,6 +117,7 @@ jobs:
           esac
 
           if [ -n "$TOP_K" ]; then echo "RETRIEVAL_TOP_K=$TOP_K" >> "$GITHUB_ENV"; fi
+          echo "RETRIEVAL_MODE=${RETRIEVAL:-vector}" >> "$GITHUB_ENV"
 
           # A fixed judge grades every model the same way. Answers keep the provider above.
           case "$JUDGE" in
