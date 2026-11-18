@@ -18,6 +18,9 @@ from assistente_docs.rag.llm import Completion, LlmError, QuotaExhaustedError
 # Free tiers limit requests per minute; these statuses mean "try again shortly".
 RETRYABLE_STATUS = frozenset({429, 500, 502, 503})
 MAX_RETRIES = 3
+# Groq answers 400 json_validate_failed when the model's output breaks the schema. The
+# same request usually succeeds on the next try, so it is retried like a transient error.
+JSON_GENERATION_FAILED = "json_validate_failed"
 # A 429 for a *daily* quota won't clear by waiting a minute, so it is not retried.
 DAILY_QUOTA_PATTERN = re.compile(r"per day|perday|\bRPD\b|daily", re.IGNORECASE)
 DEFAULT_RETRY_SECONDS = 15.0
@@ -155,7 +158,10 @@ class OpenAICompatLlm:
                 raise QuotaExhaustedError(
                     f"Cota diária do LLM esgotada (HTTP 429): {response.text[:300]}"
                 )
-            if response.status_code not in RETRYABLE_STATUS or attempt == MAX_RETRIES:
+            retryable = response.status_code in RETRYABLE_STATUS or (
+                response.status_code == 400 and JSON_GENERATION_FAILED in response.text
+            )
+            if not retryable or attempt == MAX_RETRIES:
                 return response
             self._sleep(_retry_delay(response, attempt))
         raise AssertionError("unreachable")

@@ -338,3 +338,38 @@ def test_a_judge_on_another_provider_does_not_inherit_the_answer_seed() -> None:
     assert judge.llm_reasoning_effort is None
     assert judge.llm_temperature == 0
     assert judge.llm_base_url == "https://generativelanguage.googleapis.com/v1beta/openai"
+
+
+def test_json_generation_failures_are_retried() -> None:
+    draft = json.dumps({"status": "answered", "answer": "Ok [1].", "cited_ids": [1]})
+    attempts = []
+
+    def broken_then_ok(request: httpx.Request) -> httpx.Response:
+        attempts.append(request)
+        if len(attempts) == 1:
+            return httpx.Response(
+                400,
+                json={
+                    "error": {"code": "json_validate_failed", "message": "Failed to generate JSON"}
+                },
+            )
+        return httpx.Response(200, json=chat_response(draft))
+
+    llm, _ = make_llm(broken_then_ok)
+
+    assert LlmAnswerer(llm).answer("Pergunta?", [make_retrieved(1)]).output.answer == "Ok [1]."
+    assert len(attempts) == 2
+
+
+def test_other_bad_requests_are_not_retried() -> None:
+    attempts = []
+
+    def bad(request: httpx.Request) -> httpx.Response:
+        attempts.append(request)
+        return httpx.Response(400, json={"error": {"code": "invalid_request_error"}})
+
+    llm, _ = make_llm(bad)
+
+    with pytest.raises(LlmError, match="HTTP 400"):
+        LlmAnswerer(llm).answer("Pergunta?", [make_retrieved(1)])
+    assert len(attempts) == 1

@@ -121,3 +121,156 @@
   resposta_esperada: "O assistente deve perguntar qual é o problema (erro ao criar, pagamento não confirmado, webhook não recebido?) e de qual forma de pagamento se trata, em vez de chutar."
   fonte: ""
   tem_resposta: true
+
+# --- Casos 15 a 33 (19/11/2026): uma página por assunto ainda sem pergunta ---
+
+- id: 15
+  categoria: autenticacao
+  pergunta: "Minha chave de API parou de funcionar depois de meses sem uso. Por quê?"
+  resposta_esperada: "Chaves sem uso são desabilitadas depois de 3 meses de inatividade e passam a retornar 401 Unauthorized; dá para habilitá-las de novo em Integrações > Chaves de API. Com 6 meses de inatividade a chave é expirada permanentemente, não pode ser reativada, e é preciso criar uma nova."
+  fonte: "https://docs.asaas.com/docs/chaves-de-api"
+  trechos: ["Integrações > Chaves de API", "expirada permanentemente"]
+  tem_resposta: true
+
+- id: 16
+  categoria: autenticacao
+  pergunta: "Perdi minha chave de API. Consigo recuperar?"
+  resposta_esperada: "Não. A chave de API é exibida apenas uma vez e não pode ser recuperada depois; se ela for perdida, é preciso criar uma nova pela interface web. Uma conta pode ter até 10 chaves de API."
+  fonte: "https://docs.asaas.com/docs/chaves-de-api"
+  trechos: ["exibida apenas uma vez", "10 chaves de API"]
+  tem_resposta: true
+
+- id: 17
+  categoria: autenticacao
+  pergunta: "Minha integração funcionava no sandbox e começou a falhar na autenticação quando passei para produção. O que pode ser?"
+  resposta_esperada: "Provavelmente a integração passou a usar a URL de produção mas manteve a API Key gerada no sandbox. Cada ambiente exige sua própria credencial: confirme a URL em uso, verifique em qual ambiente a chave foi gerada, substitua pela chave do ambiente correto e faça uma chamada autenticada simples para validar."
+  fonte: "https://docs.asaas.com/docs/api-key-de-sandbox-usada-em-produção"
+  trechos: ["Cada ambiente exige sua própria credencial"]
+  tem_resposta: true
+
+- id: 18
+  categoria: cobrancas
+  pergunta: "Quais dados envio para cadastrar um cliente e como relaciono esse cadastro com o cliente do meu sistema?"
+  resposta_esperada: "Envie POST /v3/customers com pelo menos o nome (`name`) e o CPF ou CNPJ (`cpfCnpj`); e-mail e celular são opcionais. Use `externalReference` para guardar o identificador do cliente no seu sistema. Armazene o `id` retornado (por exemplo `cus_000005219613`), que vai no campo `customer` das cobranças."
+  fonte: "https://docs.asaas.com/docs/criando-um-cliente"
+  trechos: ["POST /v3/customers", "externalReference"]
+  tem_resposta: true
+
+- id: 19
+  categoria: cobrancas
+  pergunta: "A requisição para criar um cliente deu timeout. Posso simplesmente reenviar?"
+  resposta_esperada: "Não sem verificar antes. Em caso de timeout ou resposta inconclusiva, consulte os clientes existentes antes de repetir a criação: o Asaas permite clientes duplicados, e reenviar sem essa verificação pode gerar um cadastro duplicado."
+  fonte: "https://docs.asaas.com/docs/criando-um-cliente"
+  trechos: ["timeout ou resposta inconclusiva", "duplicados"]
+  tem_resposta: true
+
+- id: 20
+  categoria: cobrancas
+  pergunta: "Como crio uma chave Pix pela API?"
+  resposta_esperada: "Envie POST /v3/pix/addressKeys com `type` igual a `EVP`: pela API só é possível criar chaves aleatórias. A criação só fica disponível com a conta 100% aprovada e a prova de vida feita. Os limites são 5 chaves para pessoa física e 20 para pessoa jurídica, e é preciso aguardar 1 minuto entre a criação de cada chave."
+  fonte: "https://docs.asaas.com/docs/pix"
+  trechos: ["/v3/pix/addressKeys", "EVP"]
+  tem_resposta: true
+
+- id: 21
+  categoria: cobrancas
+  pergunta: "Como cobro no cartão de crédito direto no checkout da minha aplicação, sem mandar o cliente para a fatura do Asaas?"
+  resposta_esperada: "Crie a cobrança em POST /v3/payments com `billingType` igual a `CREDIT_CARD` e envie os objetos `creditCard` e `creditCardHolderInfo`, além de `remoteIp` com o IP do dispositivo do pagador. O pagamento é processado na hora: se for autorizado, a API retorna HTTP 200; se for recusado, retorna HTTP 400 e a cobrança não é criada."
+  fonte: "https://docs.asaas.com/docs/cobrancas-via-cartao-de-credito"
+  trechos: ["creditCardHolderInfo", "remoteIp"]
+  tem_resposta: true
+
+- id: 22
+  categoria: cobrancas
+  pergunta: "Como cobro de novo o mesmo cartão sem pedir os dados outra vez?"
+  resposta_esperada: "Depois de uma transação aprovada, a resposta pode trazer `creditCardToken`. Nas próximas cobranças do mesmo cliente, envie esse token no lugar de `creditCard` e `creditCardHolderInfo`. O token só vale para o cliente para o qual foi criado, e em produção a tokenização depende de habilitação na conta."
+  fonte: "https://docs.asaas.com/docs/cobrancas-via-cartao-de-credito"
+  trechos: ["creditCardToken"]
+  tem_resposta: true
+
+- id: 23
+  categoria: cobrancas
+  pergunta: "Como crio uma cobrança parcelada no boleto?"
+  resposta_esperada: "Envie POST /v3/payments com `billingType` igual a `BOLETO`, `installmentCount` e `installmentValue` (valor de cada parcela) ou `totalValue` (valor total), nunca os dois. A API retorna a primeira cobrança; o campo `installment` identifica o parcelamento, e as parcelas são listadas em GET /v3/installments/{id}/payments. O boleto aceita até 180 parcelas."
+  fonte: "https://docs.asaas.com/docs/criar-uma-cobranca-parcelada"
+  trechos: ["installmentCount", "/v3/installments/", "180 parcelas"]
+  tem_resposta: true
+
+- id: 24
+  categoria: cobrancas
+  pergunta: "Como sei se um estorno já foi concluído?"
+  resposta_esperada: "Consulte o array `refunds` da cobrança: cada item é um estorno com valor e status. Só considere devolvido o item com status `DONE`; `PENDING` ainda está em processamento e `CANCELLED` não foi devolvido. Uma cobrança pode ter mais de um estorno, então percorra todos os itens."
+  fonte: "https://docs.asaas.com/docs/estornos"
+  trechos: ["refunds", "DONE", "PENDING"]
+  tem_resposta: true
+
+- id: 25
+  categoria: webhooks
+  pergunta: "Como crio um webhook pela API?"
+  resposta_esperada: "Envie POST /v3/webhooks com `name`, `url`, `email`, `enabled`, `interrupted`, `apiVersion`, `authToken`, `sendType` e a lista `events`. Cada conta pode ter até 10 Webhooks. O `authToken` só é retornado na resposta da criação, então guarde-o para validar as notificações."
+  fonte: "https://docs.asaas.com/docs/criar-novo-webhook-pela-api"
+  trechos: ["POST /v3/webhooks", "sendType"]
+  tem_resposta: true
+
+- id: 26
+  categoria: webhooks
+  pergunta: "Recebi o mesmo evento de webhook duas vezes. Como evito processar em dobro?"
+  resposta_esperada: "Os Webhooks seguem o modelo at least once e uma reentrega mantém o mesmo `id`. Use o `id` do evento como chave única (por exemplo com restrição UNIQUE no banco): persista o evento, responda HTTP 200 e processe a regra de negócio em segundo plano; uma nova entrega do mesmo `id` não cria outro registro."
+  fonte: "https://docs.asaas.com/docs/como-implementar-idempotencia-em-webhooks"
+  trechos: ["at least once", "UNIQUE"]
+  tem_resposta: true
+
+- id: 27
+  categoria: webhooks
+  pergunta: "Vale a pena consultar a API de tempos em tempos para saber se um pagamento foi feito?"
+  resposta_esperada: "Não como mecanismo principal. Para acompanhar mudanças de estado, prefira Webhooks. Polling frequente consome os limites da API e pode resultar em HTTP 429 Too Many Requests; use consultas GET só para recuperar o estado atual sob demanda."
+  fonte: "https://docs.asaas.com/docs/polling-vs-webhooks"
+  trechos: ["429"]
+  tem_resposta: true
+
+- id: 28
+  categoria: webhooks
+  pergunta: "Qual a diferença entre envio sequencial e não sequencial nos webhooks?"
+  resposta_esperada: "`SEQUENTIALLY` preserva a ordem dos eventos, com vazão menor, e um evento lento ou com falha atrasa os seguintes. `NON_SEQUENTIALLY` permite entregas em paralelo, com vazão maior e sem garantia de ordem. Nos dois casos o mesmo evento pode chegar mais de uma vez, então a idempotência é necessária."
+  fonte: "https://docs.asaas.com/docs/tipos-de-envio"
+  trechos: ["SEQUENTIALLY", "NON_SEQUENTIALLY"]
+  tem_resposta: true
+
+- id: 29
+  categoria: webhooks
+  pergunta: "Quanto tempo meu endpoint tem para responder um webhook?"
+  resposta_esperada: "O Asaas aguarda até 10 segundos pela resposta. Se o tempo for excedido, a tentativa conta como falha e entra no ciclo de retentativas. Por isso o endpoint deve persistir o evento, responder HTTP 200 e deixar o processamento demorado para depois."
+  fonte: "https://docs.asaas.com/docs/faq-de-webhooks"
+  trechos: ["10 segundos"]
+  tem_resposta: true
+
+- id: 30
+  categoria: webhooks
+  pergunta: "Corrigi o erro do meu endpoint, mas o webhook continua penalizado. Preciso esperar o próximo intervalo?"
+  resposta_esperada: "Não. Depois de corrigir a causa, dá para remover a penalização em Integrações > Webhooks, no botão Remover penalização, ou pela API com POST /v3/webhooks/{id}/removeBackoff (resposta HTTP 204). Isso é diferente de reativar uma fila já interrompida após 15 falhas, que tem fluxo próprio."
+  fonte: "https://docs.asaas.com/docs/penalização-de-filas"
+  trechos: ["removeBackoff"]
+  tem_resposta: true
+
+- id: 31
+  categoria: webhooks
+  pergunta: "Como reativo pela API uma fila de webhook que foi interrompida?"
+  resposta_esperada: "Primeiro corrija a causa das falhas, senão a fila volta a ser interrompida. Depois envie PUT /v3/webhooks/{id} com `interrupted` igual a `false`; a resposta HTTP 200 confirma. Os eventos que ficaram armazenados voltam a ser enviados após a reativação."
+  fonte: "https://docs.asaas.com/docs/como-reativar-fila-interrompida"
+  trechos: ["PUT /v3/webhooks/{id}", "\"interrupted\": false"]
+  tem_resposta: true
+
+- id: 32
+  categoria: webhooks
+  pergunta: "Meu firewall está bloqueando os webhooks do Asaas. Quais IPs eu libero?"
+  resposta_esperada: "Em produção, os Webhooks podem vir dos IPs 52.67.12.206, 18.230.8.159, 54.94.136.112 e 54.94.183.101. No Sandbox podem existir IPs adicionais, então a lista de produção não garante a cobertura do Sandbox."
+  fonte: "https://docs.asaas.com/docs/ips-oficiais-do-asaas"
+  trechos: ["52.67.12.206", "54.94.183.101"]
+  tem_resposta: true
+
+- id: 33
+  categoria: fora_do_recorte
+  pergunta: "Como consulto o extrato da minha conta pela API?"
+  resposta_esperada: "O assistente deve dizer que esse assunto não está na base que ele consulta."
+  fonte: ""
+  tem_resposta: false
