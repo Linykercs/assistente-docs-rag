@@ -9,15 +9,17 @@ import httpx
 
 from assistente_docs.bootstrap import (
     build_embedder,
+    build_retriever,
     build_store,
     open_llm,
     open_rag_service,
 )
 from assistente_docs.config import Settings, get_settings
 from assistente_docs.evals.aggregate import summarize_runs, write_runs_report
-from assistente_docs.evals.dataset import load_cases
+from assistente_docs.evals.dataset import EvalCase, load_cases
 from assistente_docs.evals.judge import LlmJudge
 from assistente_docs.evals.report import write_report
+from assistente_docs.evals.retrieval_only import run_retrieval_evals, write_retrieval_report
 from assistente_docs.evals.runner import run_evals
 from assistente_docs.evals.scoring import summarize
 from assistente_docs.ingestion.fetcher import PageFetcher
@@ -48,6 +50,17 @@ def main() -> None:
         default=1,
         help="roda a suíte N vezes e gera também um resumo com média, mínimo e máximo",
     )
+    eval_parser.add_argument(
+        "--only-retrieval",
+        action="store_true",
+        help="mede só o retrieval (retrieval hit e context hit), sem chamar LLM nem juiz",
+    )
+    eval_parser.add_argument(
+        "--cases",
+        type=_parse_case_ids,
+        default=None,
+        help="roda só os casos indicados, por exemplo --cases 7,23,24",
+    )
 
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -61,7 +74,14 @@ def main() -> None:
         case "ask":
             _ask(settings, args.question)
         case "eval":
-            _eval(settings, dataset=args.dataset, output_dir=args.output_dir, repeat=args.repeat)
+            _eval(
+                settings,
+                dataset=args.dataset,
+                output_dir=args.output_dir,
+                repeat=args.repeat,
+                only_retrieval=args.only_retrieval,
+                case_ids=args.cases,
+            )
 
 
 def _init_db(settings: Settings) -> None:
@@ -105,10 +125,33 @@ def _ask(settings: Settings, question: str) -> None:
         print(f"[{source.id}] {source.title} - {source.url}")
 
 
-def _eval(settings: Settings, *, dataset: Path, output_dir: Path, repeat: int = 1) -> None:
+def _parse_case_ids(value: str) -> set[int]:
+    try:
+        return {int(part) for part in value.split(",") if part.strip()}
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("use números separados por vírgula, ex.: 7,23") from exc
+
+
+def _eval(
+    settings: Settings,
+    *,
+    dataset: Path,
+    output_dir: Path,
+    repeat: int = 1,
+    only_retrieval: bool = False,
+    case_ids: set[int] | None = None,
+) -> None:
     if repeat < 1:
         raise SystemExit("--repeat precisa ser 1 ou mais.")
     cases = load_cases(dataset)
+    if case_ids:
+        unknown = case_ids - {case.id for case in cases}
+        if unknown:
+            raise SystemExit(f"Casos inexistentes no dataset: {sorted(unknown)}")
+        cases = [case for case in cases if case.id in case_ids]
+    if only_retrieval:
+        _eval_retrieval(settings, cases, output_dir)
+        return
     runs = []
     with (
         open_llm(settings.for_judge(), model=settings.judge_model) as judge_llm,
@@ -148,6 +191,24 @@ def _eval(settings: Settings, *, dataset: Path, output_dir: Path, repeat: int = 
         print(f"Resumo: {markdown_path} e {json_path}")
     if not any(runs):
         raise SystemExit("Nenhum caso foi avaliado.")
+
+
+def _eval_retrieval(settings: Settings, cases: list[EvalCase], output_dir: Path) -> None:
+    label = (
+        f"{settings.embedding_model}, {settings.retrieval_mode}, top_k {settings.retrieval_top_k}, "
+        f"expansão {settings.context_expand_top}"
+    )
+    with build_store(settings) as store:
+        results = run_retrieval_evals(cases, build_retriever(settings, store))
+    markdown_path, json_path = write_retrieval_report(
+        results, output_dir, generated_at=datetime.now(UTC), settings_label=label
+    )
+    pages = [r.retrieval_hit for r in results if r.retrieval_hit is not None]
+    contexts = [r.context_hit for r in results if r.context_hit is not None]
+    print(f"Configuração: {label}")
+    print(f"retrieval_hit: {sum(pages)}/{len(pages)}")
+    print(f"context_hit: {sum(contexts)}/{len(contexts)}")
+    print(f"Relatório: {markdown_path} e {json_path}")
 
 
 if __name__ == "__main__":

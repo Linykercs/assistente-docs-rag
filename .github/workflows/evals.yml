@@ -31,6 +31,19 @@ on:
         type: choice
         options: [vector, hybrid]
         default: vector
+      only_retrieval:
+        description: "Mede só o retrieval (sem LLM nem juiz, não gasta cota)"
+        type: boolean
+        default: false
+      cases:
+        description: "Só estes casos, ex.: 7,23,24 (vazio = todos)"
+        type: string
+        default: ""
+      embedding:
+        description: "Modelo de embeddings"
+        type: choice
+        options: [e5-large, minilm, mpnet, qwen3-q]
+        default: e5-large
       repeat:
         description: "Quantas vezes rodar a suíte (resumo com média, mínimo e máximo)"
         type: string
@@ -151,6 +164,37 @@ jobs:
               echo "JUDGE_PROVIDER=anthropic" >> "$GITHUB_ENV" ;;
           esac
 
+      - name: Select embedding model
+        env:
+          EMBEDDING: ${{ inputs.embedding }}
+        run: |
+          # E5 is trained with "query: "/"passage: " prefixes; the others take raw text, and
+          # Qwen3 recommends an instruction on the query side only.
+          case "${EMBEDDING:-e5-large}" in
+            e5-large)
+              echo "EMBEDDING_MODEL=intfloat/multilingual-e5-large" >> "$GITHUB_ENV"
+              echo "EMBEDDING_DIM=1024" >> "$GITHUB_ENV" ;;
+            minilm)
+              echo "EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2" >> "$GITHUB_ENV"
+              echo "EMBEDDING_DIM=384" >> "$GITHUB_ENV"
+              echo "EMBEDDING_QUERY_PREFIX=" >> "$GITHUB_ENV"
+              echo "EMBEDDING_PASSAGE_PREFIX=" >> "$GITHUB_ENV" ;;
+            mpnet)
+              echo "EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-mpnet-base-v2" >> "$GITHUB_ENV"
+              echo "EMBEDDING_DIM=768" >> "$GITHUB_ENV"
+              echo "EMBEDDING_QUERY_PREFIX=" >> "$GITHUB_ENV"
+              echo "EMBEDDING_PASSAGE_PREFIX=" >> "$GITHUB_ENV" ;;
+            qwen3-q)
+              echo "EMBEDDING_MODEL=Qwen/Qwen3-Embedding-0.6B-Q" >> "$GITHUB_ENV"
+              echo "EMBEDDING_DIM=1024" >> "$GITHUB_ENV"
+              {
+                echo "EMBEDDING_QUERY_PREFIX<<PREFIX_EOF"
+                printf 'Instruct: Given a question, retrieve documentation passages that answer it\nQuery: \n'
+                echo "PREFIX_EOF"
+              } >> "$GITHUB_ENV"
+              echo "EMBEDDING_PASSAGE_PREFIX=" >> "$GITHUB_ENV" ;;
+          esac
+
       - name: Download local model
         if: inputs.provider == 'local'
         run: |
@@ -161,7 +205,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .fastembed
-          key: fastembed-multilingual-e5-large
+          key: fastembed-${{ inputs.embedding || 'e5-large' }}
 
       - name: Create schema
         run: uv run assistente-docs init-db
@@ -172,7 +216,13 @@ jobs:
       - name: Run evals
         env:
           REPEAT: ${{ inputs.repeat }}
-        run: uv run assistente-docs eval --repeat "${REPEAT:-1}"
+          CASES: ${{ inputs.cases }}
+          ONLY_RETRIEVAL: ${{ inputs.only_retrieval }}
+        run: |
+          args=(--repeat "${REPEAT:-1}")
+          if [ -n "$CASES" ]; then args+=(--cases "$CASES"); fi
+          if [ "$ONLY_RETRIEVAL" = "true" ]; then args+=(--only-retrieval); fi
+          uv run assistente-docs eval "${args[@]}"
 
       - name: Upload report
         if: always()
