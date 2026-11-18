@@ -49,6 +49,13 @@ class CaseStability:
     applicable: dict[str, int]
 
 
+def load_report(path: Path) -> tuple[str, str, list[CaseResult]]:
+    """Read back a single-run JSON report: (model, judge model, results)."""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    results = [CaseResult(**case) for case in data["cases"]]
+    return data["model"], data["judge_model"], results
+
+
 def summarize_runs(runs: Sequence[Sequence[CaseResult]]) -> dict[str, RunsSummary]:
     per_run = [summarize(results) for results in runs]
     return {

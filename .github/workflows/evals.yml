@@ -1,7 +1,14 @@
 name: Evals
 
-# Runs the full pipeline against the real docs and the real LLM, so it is manual only.
+# Runs the full pipeline against the real docs and the real LLM. Manual runs pick the
+# configuration; the scheduled run repeats the project defaults once, because the free tier's
+# daily token quota (200k per model) fits one full run of the suite, not three.
+# Combine the scheduled reports with `assistente-docs resumo`.
 on:
+  schedule:
+    # Every other day (06:23 BRT): a full run takes almost all of the daily quota, and the
+    # days in between are left for targeted experiments (--cases).
+    - cron: '23 9 */2 * *'
   workflow_dispatch:
     inputs:
       provider:
@@ -86,17 +93,17 @@ jobs:
           - 11434:11434
 
     env:
-      LLM_PROVIDER: ${{ inputs.provider == 'claude' && 'anthropic' || 'openai_compat' }}
+      LLM_PROVIDER: ${{ (inputs.provider || 'groq') == 'claude' && 'anthropic' || 'openai_compat' }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      LLM_REASONING_EFFORT: ${{ (inputs.provider == 'groq' || inputs.provider == 'gemini') && 'low' || '' }}
+      LLM_REASONING_EFFORT: ${{ ((inputs.provider || 'groq') == 'groq' || (inputs.provider || 'groq') == 'gemini') && 'low' || '' }}
       # Repeatable answers, so a change in the scores comes from the code, not from sampling.
-      LLM_TEMPERATURE: ${{ inputs.provider != 'claude' && '0' || '' }}
+      LLM_TEMPERATURE: ${{ (inputs.provider || 'groq') != 'claude' && '0' || '' }}
       # Ollama and Groq accept a fixed seed; Gemini rejects the field.
-      LLM_SEED: ${{ (inputs.provider == 'local' || inputs.provider == 'groq') && '0' || '' }}
+      LLM_SEED: ${{ ((inputs.provider || 'groq') == 'local' || (inputs.provider || 'groq') == 'groq') && '0' || '' }}
       DEFAULT_MODEL: >-
-        ${{ inputs.provider == 'local' && 'qwen2.5:3b'
-        || inputs.provider == 'groq' && 'openai/gpt-oss-120b'
-        || inputs.provider == 'gemini' && 'gemini-flash-latest'
+        ${{ (inputs.provider || 'groq') == 'local' && 'qwen2.5:3b'
+        || (inputs.provider || 'groq') == 'groq' && 'openai/gpt-oss-120b'
+        || (inputs.provider || 'groq') == 'gemini' && 'gemini-flash-latest'
         || 'claude-sonnet-5-5' }}
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/assistente_docs
       FASTEMBED_CACHE_PATH: ${{ github.workspace }}/.fastembed
@@ -113,9 +120,10 @@ jobs:
 
       - name: Select LLM provider
         env:
-          PROVIDER: ${{ inputs.provider }}
-          MODEL: ${{ inputs.model }}
-          JUDGE: ${{ inputs.judge }}
+          PROVIDER: ${{ (inputs.provider || 'groq') }}
+          # The daily run pins the model the comparisons use; manual runs pick their own.
+          MODEL: ${{ inputs.model || (github.event_name == 'schedule' && 'openai/gpt-oss-20b') || '' }}
+          JUDGE: ${{ inputs.judge || 'groq' }}
           JUDGE_MODEL_INPUT: ${{ inputs.judge_model }}
           TOP_K: ${{ inputs.top_k }}
           RETRIEVAL: ${{ inputs.retrieval }}
@@ -196,7 +204,7 @@ jobs:
           esac
 
       - name: Download local model
-        if: inputs.provider == 'local'
+        if: (inputs.provider || 'groq') == 'local'
         run: |
           for i in $(seq 1 30); do curl -sf http://localhost:11434/api/version && break; sleep 2; done
           curl -sSf http://localhost:11434/api/pull -d "{\"model\": \"$LLM_MODEL\", \"stream\": false}"

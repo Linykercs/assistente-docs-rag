@@ -15,7 +15,7 @@ from assistente_docs.bootstrap import (
     open_rag_service,
 )
 from assistente_docs.config import Settings, get_settings
-from assistente_docs.evals.aggregate import summarize_runs, write_runs_report
+from assistente_docs.evals.aggregate import load_report, summarize_runs, write_runs_report
 from assistente_docs.evals.dataset import EvalCase, load_cases
 from assistente_docs.evals.judge import LlmJudge
 from assistente_docs.evals.report import write_report
@@ -40,6 +40,14 @@ def main() -> None:
 
     ask_parser = commands.add_parser("ask", help="faz uma pergunta ao assistente")
     ask_parser.add_argument("question")
+
+    summary_parser = commands.add_parser(
+        "resumo", help="junta relatórios JSON de execuções separadas (ex.: um por dia)"
+    )
+    summary_parser.add_argument(
+        "reports", nargs="+", type=Path, help="eval-*.json de cada execução"
+    )
+    summary_parser.add_argument("--output-dir", type=Path, default=Path("evals/reports"))
 
     eval_parser = commands.add_parser("eval", help="roda a suíte de evals e gera o relatório")
     eval_parser.add_argument("--dataset", type=Path, default=Path("evals/perguntas.yaml"))
@@ -73,6 +81,8 @@ def main() -> None:
             _ingest(settings, refresh=args.refresh)
         case "ask":
             _ask(settings, args.question)
+        case "resumo":
+            _summarize_reports(args.reports, output_dir=args.output_dir)
         case "eval":
             _eval(
                 settings,
@@ -191,6 +201,30 @@ def _eval(
         print(f"Resumo: {markdown_path} e {json_path}")
     if not any(runs):
         raise SystemExit("Nenhum caso foi avaliado.")
+
+
+def _summarize_reports(paths: list[Path], *, output_dir: Path) -> None:
+    runs, models, judges = [], set(), set()
+    for path in paths:
+        model, judge_model, results = load_report(path)
+        runs.append(results)
+        models.add(model)
+        judges.add(judge_model)
+    if len(models) > 1 or len(judges) > 1:
+        raise SystemExit(
+            f"Relatórios de configurações diferentes: modelos {models}, juízes {judges}"
+        )
+    markdown_path, json_path = write_runs_report(
+        runs,
+        output_dir,
+        generated_at=datetime.now(UTC),
+        model=models.pop(),
+        judge_model=judges.pop(),
+    )
+    for metric, item in summarize_runs(runs).items():
+        each = ", ".join(f"{p}/{t}" for p, t in zip(item.passed, item.total, strict=True))
+        print(f"{metric}: {each}")
+    print(f"Resumo: {markdown_path} e {json_path}")
 
 
 def _eval_retrieval(settings: Settings, cases: list[EvalCase], output_dir: Path) -> None:

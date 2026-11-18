@@ -223,6 +223,20 @@ nem cota; `claude` usa o secret `ANTHROPIC_API_KEY`, `groq` usa `GROQ_API_KEY` e
 `LLM_API_KEY`. O input `judge` fixa o juiz em outro provedor, para que modelos diferentes sejam
 corrigidos pelo mesmo critério.
 
+O conjunto tem 33 casos: 29 com resposta na documentação (um ou mais por página indexada), 2
+fora do recorte e 2 ambíguos. Opções do comando `eval` para medir sem gastar cota à toa:
+
+| Opção | Para quê |
+| --- | --- |
+| `--repeat N` | Roda N vezes e gera um resumo com cada execução, média, mínimo e máximo, e a estabilidade de cada caso |
+| `--only-retrieval` | Mede só retrieval hit e context hit, sem LLM nem juiz. O retrieval é determinístico e não gasta cota |
+| `--cases 7,23` | Roda só os casos indicados |
+
+O plano gratuito do Groq tem cota de 200 mil tokens por dia e por modelo, e uma execução
+completa usa quase tudo. Por isso o workflow roda sozinho a cada dois dias com a configuração
+padrão, e `assistente-docs resumo evals/reports/eval-*.json` junta as execuções de dias
+diferentes num resumo só. Os dias livres ficam para testes com `--cases`.
+
 ### Resultados
 
 Primeira rodada de melhoria guiada pelas evals, com o modelo aberto `qwen2.5:3b` (Ollama, CPU)
@@ -382,6 +396,30 @@ para 8/10), continuam valendo. Daqui em diante, comparar corretude pede rodadas 
 Execuções: [expansão desligada](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44359162190) ·
 [expansão dos 3 melhores](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44361703035).
 
+#### Modelo de embeddings
+
+Com o gabarito de 33 casos, a comparação de embeddings foi feita só no retrieval
+(`--only-retrieval`): o resultado é determinístico e não gasta cota de LLM. Mesma configuração
+de busca (`top_k` 10, expansão dos 3 melhores), 29 perguntas com resposta.
+
+| Modelo | Tamanho | Retrieval hit | Context hit |
+| --- | --- | --- | --- |
+| **`intfloat/multilingual-e5-large`** (atual) | 2,24 GB | **29/29** | **25/29** |
+| `paraphrase-multilingual-mpnet-base-v2` | 1,0 GB | 28/29 | 22/29 |
+| `Qwen/Qwen3-Embedding-0.6B-Q` | 1,1 GB | 26/29 | 21/29 |
+| `paraphrase-multilingual-MiniLM-L12-v2` | 0,22 GB | 26/29 | 20/29 |
+
+- **O modelo atual fica.** O teste era para ver se um modelo menor caberia numa demo sem
+  perder qualidade, e não cabe: o MiniLM, 10 vezes menor, perde o trecho certo em mais 5
+  perguntas.
+- **Falha em todos:** as perguntas 6 e 17 não recebem o trecho certo com nenhum dos quatro
+  modelos, então a causa não está no modelo de embeddings.
+
+Execuções: [e5-large](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44374276425) ·
+[mpnet](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44374306954) ·
+[qwen3](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44374323615) ·
+[minilm](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44374292850).
+
 ## Observabilidade
 
 Com `LANGFUSE_PUBLIC_KEY` e `LANGFUSE_SECRET_KEY` definidas (e o extra instalado:
@@ -484,7 +522,9 @@ rodadas para medir corretude acima do ruído do provedor e o deploy público.
 - [ ] Parâmetros da referência da API (OpenAPI) indexados de forma estruturada
 - [x] Busca híbrida (vetorial + full-text do Postgres): medida, piorou, fica desligada
 - [x] Expansão de contexto (small-to-big): context hit 9/11 → 10/11
-- [ ] Rodadas repetidas por configuração, para comparar corretude acima do ruído
+- [x] Rodadas repetidas (`--repeat`), modo só retrieval e gabarito com 33 casos
+- [x] Comparação de modelos de embeddings (o atual segue o melhor)
+- [ ] Linha de base de corretude com 33 casos, juntando execuções de dias diferentes
 - [ ] Evals automáticas a cada mudança de prompt ou de chunking
 
 ## Licença

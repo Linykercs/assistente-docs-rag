@@ -86,3 +86,24 @@ def test_runs_report_is_written_as_markdown_and_json(tmp_path: Path) -> None:
     assert "| Resposta correta (LLM-as-judge) | 2/3, 1/3 | 50% | 33% | 67% |" in markdown
     assert "| 3 | Pergunta 3? | 1/2 | n/a | 0/2 |" in markdown
     assert '"runs": 2' in json_path.read_text(encoding="utf-8")
+
+
+def test_single_run_reports_can_be_read_back_and_combined(tmp_path: Path) -> None:
+    from assistente_docs.evals.aggregate import load_report
+    from assistente_docs.evals.report import write_report
+
+    paths = []
+    for day, results in enumerate(RUNS, start=1):
+        _, json_path = write_report(
+            results,
+            tmp_path,
+            generated_at=datetime(2026, 1, day, 12, 0, tzinfo=UTC),
+            model="m",
+            judge_model="j",
+        )
+        paths.append(json_path)
+
+    loaded = [load_report(path) for path in paths]
+
+    assert {(model, judge) for model, judge, _ in loaded} == {("m", "j")}
+    assert summarize_runs([results for _, _, results in loaded])["correct"].passed == [2, 1, 2]
