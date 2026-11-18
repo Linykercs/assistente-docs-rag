@@ -17,6 +17,9 @@ class EvalCase(BaseModel):
     # Empty while the dataset owner hasn't written the reference answer / source yet.
     resposta_esperada: str = ""
     fonte: str = ""
+    # Terms that must be in the retrieved context for the answer to be possible at all.
+    # The page can be retrieved while the chunk with the detail is left out of the top k.
+    trechos: list[str] = []
     tem_resposta: bool
 
     @property

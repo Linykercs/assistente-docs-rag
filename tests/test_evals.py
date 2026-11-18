@@ -20,6 +20,7 @@ def make_case(
     categoria: str = "cobrancas",
     resposta_esperada: str = "",
     fonte: str = "",
+    trechos: list[str] | None = None,
     tem_resposta: bool = True,
 ) -> EvalCase:
     return EvalCase(
@@ -28,6 +29,7 @@ def make_case(
         pergunta="Como crio uma cobrança via Pix?",
         resposta_esperada=resposta_esperada,
         fonte=fonte,
+        trechos=trechos or [],
         tem_resposta=tem_resposta,
     )
 
@@ -207,3 +209,39 @@ def test_report_is_written_as_markdown_and_json(tmp_path: Path) -> None:
     assert "| Resposta correta (LLM-as-judge) | 0/0 | n/a |" in markdown
     assert "| 1 | cobrancas | answered | answered | ok | ok | n/a | n/a |" in markdown
     assert '"judge_model": "fake-judge"' in json_path.read_text(encoding="utf-8")
+
+
+def test_context_hit_needs_every_expected_term_in_the_retrieved_chunks() -> None:
+    # make_answer retrieves "Conteúdo do trecho 1." and "Conteúdo do trecho 2."
+    found = score_case(make_case(trechos=["TRECHO 1", "trecho 2"]), make_answer(), verdict=None)
+    assert found.context_hit is True
+    assert found.missing_terms == []
+
+    partial = score_case(make_case(trechos=["trecho 2", "pixQrCode"]), make_answer(), verdict=None)
+    assert partial.context_hit is False
+    assert partial.missing_terms == ["pixQrCode"]
+
+
+def test_context_hit_does_not_apply_without_expected_terms() -> None:
+    result = score_case(make_case(), make_answer(), verdict=None)
+
+    assert result.context_hit is None
+    assert summarize([result])["context_hit"].total == 0
+
+
+def test_dataset_terms_are_listed_for_every_answerable_case_with_a_source() -> None:
+    cases = load_cases(DATASET)
+
+    for case in cases:
+        if case.fonte:
+            assert case.trechos, f"caso {case.id} tem fonte mas não tem trechos"
+
+
+def test_report_lists_the_terms_missing_from_the_context(tmp_path: Path) -> None:
+    results = [score_case(make_case(trechos=["pixQrCode"]), make_answer(), verdict=None)]
+
+    markdown_path, _ = write_report(
+        results, tmp_path, generated_at=datetime.now(UTC), model="m", judge_model="j"
+    )
+
+    assert "Fora do contexto recuperado: `pixQrCode`" in markdown_path.read_text(encoding="utf-8")

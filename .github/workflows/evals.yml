@@ -22,6 +22,10 @@ on:
         description: "Modelo do juiz (vazio = padrão do provedor do juiz)"
         type: string
         default: ""
+      top_k:
+        description: "Trechos recuperados por pergunta (vazio = padrão do projeto, 10)"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -87,6 +91,7 @@ jobs:
           MODEL: ${{ inputs.model }}
           JUDGE: ${{ inputs.judge }}
           JUDGE_MODEL_INPUT: ${{ inputs.judge_model }}
+          TOP_K: ${{ inputs.top_k }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.LLM_API_KEY }}
         run: |
@@ -104,6 +109,8 @@ jobs:
               echo "LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai" >> "$GITHUB_ENV"
               echo "LLM_API_KEY=$GEMINI_API_KEY" >> "$GITHUB_ENV" ;;
           esac
+
+          if [ -n "$TOP_K" ]; then echo "RETRIEVAL_TOP_K=$TOP_K" >> "$GITHUB_ENV"; fi
 
           # A fixed judge grades every model the same way. Answers keep the provider above.
           case "$JUDGE" in
