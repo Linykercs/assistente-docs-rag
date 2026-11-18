@@ -129,3 +129,32 @@ def test_bundled_sources_file_is_valid() -> None:
 
     assert urls
     assert all(url.startswith("https://docs.asaas.com/") for url in urls)
+
+
+def test_ingest_records_the_new_order_of_chunks_already_stored(tmp_path: Path) -> None:
+    site = FakeDocsSite(
+        {f"{PAGE_URL}.md": ("text/markdown", "# Sandbox\n\n## A\n\nAlfa.\n\n## B\n\nBeta.\n")}
+    )
+    store = InMemoryChunkStore()
+
+    def run(refresh: bool = False) -> IngestReport:
+        return ingest(
+            [PAGE_URL],
+            fetcher=site.fetcher(tmp_path, refresh=refresh),
+            embedder=FakeEmbedder(),
+            store=store,
+            max_chars=500,
+            overlap_chars=0,
+        )
+
+    run()
+    # A new section at the top shifts the existing ones down without changing their text.
+    site.pages[f"{PAGE_URL}.md"] = (
+        "text/markdown",
+        "# Sandbox\n\n## Novo\n\nNovo.\n\n## A\n\nAlfa.\n\n## B\n\nBeta.\n",
+    )
+    report = run(refresh=True)
+
+    assert report.embedded == 1
+    positions = {chunk.content: chunk.position for chunk in store.chunks.values()}
+    assert positions == {"Novo.": 0, "Alfa.": 1, "Beta.": 2}

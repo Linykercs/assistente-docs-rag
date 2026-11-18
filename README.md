@@ -349,6 +349,39 @@ Execuções: [vetorial](https://github.com/Linykercs/assistente-docs-rag/actions
 [híbrida](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44348116327) ·
 [vetorial + prompt](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44351053018).
 
+#### Expansão de contexto (small-to-big)
+
+As perguntas 6 e 7 não falham por falta de busca, e sim pelo tamanho do trecho. A lista de
+eventos da pergunta 7 tem uns 6.500 caracteres quebrados em 8 chunks; a pergunta 6 bate no
+passo 2 de um passo a passo cuja resposta está no passo 1. Chunks maiores não resolvem: o
+modelo de embeddings trunca o texto em 512 tokens, e o retrieval perderia precisão.
+
+A busca continua com chunks pequenos, e os 3 mais bem colocados levam junto os vizinhos
+imediatos na página e o resto da sua seção de topo, até 6.000 caracteres por grupo
+(`rag/expansion.py`). Para isso cada chunk passou a guardar a posição na página, fora do hash:
+mudar a ordem não exige embedding novo, e a ingestão regrava a ordem de toda a página.
+
+| Rodada (mesma branch) | Comportamento | Context hit | Corretude |
+| --- | --- | --- | --- |
+| Expansão desligada | 13/14 | 9/11 | 6/11 |
+| **Expansão dos 3 melhores** | 13/14 | **10/11** | 8/11 |
+
+- **Pergunta 7:** a lista inteira passou a chegar ao modelo. A resposta ainda erra: o modelo
+  resume e deixa de fora os eventos de estorno, mesmo com todos no contexto.
+- **Pergunta 6:** a página dela não fica entre os 3 primeiros, então a expansão não chega lá.
+- **Padrão:** `CONTEXT_EXPAND_TOP=3`. O ganho no contexto é determinístico e a corretude não
+  caiu.
+
+**Ruído de medição.** A rodada com a expansão desligada tem o mesmo código e a mesma
+configuração da rodada "vetorial + prompt" acima, e deu 6/11 de corretude contra 8/11. Mesmo
+com temperatura 0 e seed, o Groq não devolve sempre a mesma resposta. Com 11 casos, diferença
+de até 2 na corretude pode ser ruído. O context hit não tem esse problema (o retrieval é
+determinístico), e os ganhos anteriores maiores que isso, como o `top_k` de 6 para 10 (4/10
+para 8/10), continuam valendo. Daqui em diante, comparar corretude pede rodadas repetidas.
+
+Execuções: [expansão desligada](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44359162190) ·
+[expansão dos 3 melhores](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44361703035).
+
 ## Observabilidade
 
 Com `LANGFUSE_PUBLIC_KEY` e `LANGFUSE_SECRET_KEY` definidas (e o extra instalado:
@@ -431,9 +464,8 @@ gcloud run deploy assistente-docs-rag \
 
 Em construção. A base do código já existe (ingestão, banco vetorial, API, evals, testes e CI),
 o gabarito das evals está preenchido, e a melhoria de prompt, a comparação entre modelos e o
-ajuste do contexto estão medidos em [Resultados](#resultados). Os próximos passos são chunks
-que mantenham listas inteiras (as perguntas 6 e 7 ainda não recebem o trecho certo) e o
-deploy público.
+ajuste do contexto estão medidos em [Resultados](#resultados). Os próximos passos são repetir
+rodadas para medir corretude acima do ruído do provedor e o deploy público.
 
 ## Roadmap
 
@@ -451,7 +483,8 @@ deploy público.
 - [ ] Deploy público no Cloud Run
 - [ ] Parâmetros da referência da API (OpenAPI) indexados de forma estruturada
 - [x] Busca híbrida (vetorial + full-text do Postgres): medida, piorou, fica desligada
-- [ ] Chunking que mantenha listas e passo a passo inteiros
+- [x] Expansão de contexto (small-to-big): context hit 9/11 → 10/11
+- [ ] Rodadas repetidas por configuração, para comparar corretude acima do ruído
 - [ ] Evals automáticas a cada mudança de prompt ou de chunking
 
 ## Licença

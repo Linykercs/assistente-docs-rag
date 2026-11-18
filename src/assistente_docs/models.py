@@ -24,6 +24,9 @@ class Chunk:
     title: str
     heading: str
     content: str
+    # Order of the chunk inside its page. Not part of the identity: moving a chunk doesn't
+    # change what it says, so it doesn't need a new embedding.
+    position: int = 0
 
     @property
     def content_hash(self) -> str:

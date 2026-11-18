@@ -11,14 +11,15 @@ from psycopg_pool import ConnectionPool
 from assistente_docs.models import Chunk, RetrievedChunk
 
 _UPSERT = """
-    INSERT INTO chunks (content_hash, source_url, title, heading, content, embedding)
-    VALUES (%s, %s, %s, %s, %s, %s::vector)
+    INSERT INTO chunks (content_hash, source_url, title, heading, content, position, embedding)
+    VALUES (%s, %s, %s, %s, %s, %s, %s::vector)
     ON CONFLICT (content_hash) DO NOTHING
 """
 
 # `<=>` is pgvector's cosine distance; similarity = 1 - distance.
 _SEARCH = """
-    SELECT source_url, title, heading, content, 1 - (embedding <=> %(query)s::vector) AS score
+    SELECT source_url, title, heading, content, position,
+           1 - (embedding <=> %(query)s::vector) AS score
     FROM chunks
     ORDER BY embedding <=> %(query)s::vector
     LIMIT %(top_k)s
@@ -56,7 +57,7 @@ _HYBRID_SEARCH = """
                  + coalesce(1.0 / (%(rrf_k)s + k.rank), 0) AS rrf
         FROM semantic s FULL OUTER JOIN keyword k ON s.id = k.id
     )
-    SELECT c.source_url, c.title, c.heading, c.content,
+    SELECT c.source_url, c.title, c.heading, c.content, c.position,
            1 - (c.embedding <=> %(query)s::vector) AS score
     FROM fused f JOIN chunks c ON c.id = f.id
     ORDER BY f.rrf DESC
@@ -109,12 +110,35 @@ class PgVectorStore:
                 chunk.title,
                 chunk.heading,
                 chunk.content,
+                chunk.position,
                 _vector_literal(embedding),
             )
             for chunk, embedding in zip(chunks, embeddings, strict=True)
         ]
         with self._pool.connection() as conn, conn.cursor() as cursor:
             cursor.executemany(_UPSERT, rows)
+
+    def update_positions(self, source_url: str, positions: Sequence[tuple[str, int]]) -> None:
+        """Record the current order of a page's chunks, including those already stored."""
+        rows = [(position, content_hash, source_url) for content_hash, position in positions]
+        with self._pool.connection() as conn, conn.cursor() as cursor:
+            cursor.executemany(
+                "UPDATE chunks SET position = %s WHERE content_hash = %s AND source_url = %s",
+                rows,
+            )
+
+    def page_chunks(self, source_url: str) -> list[Chunk]:
+        """Every chunk of a page, in page order."""
+        with self._pool.connection() as conn:
+            rows = conn.execute(
+                "SELECT source_url, title, heading, content, position FROM chunks "
+                "WHERE source_url = %s ORDER BY position, id",
+                (source_url,),
+            ).fetchall()
+        return [
+            Chunk(source_url=url, title=title, heading=heading, content=content, position=pos)
+            for url, title, heading, content, pos in rows
+        ]
 
     def delete_stale(self, source_url: str, keep_hashes: Collection[str]) -> int:
         """Delete chunks of a page that are no longer part of its current content."""
@@ -156,13 +180,17 @@ class PgVectorStore:
         return _to_retrieved(rows)
 
 
-def _to_retrieved(rows: Sequence[tuple[str, str, str, str, float]]) -> list[RetrievedChunk]:
+def _to_retrieved(
+    rows: Sequence[tuple[str, str, str, str, int, float]],
+) -> list[RetrievedChunk]:
     return [
-            RetrievedChunk(
-                chunk=Chunk(source_url=url, title=title, heading=heading, content=content),
-                score=float(score),
-            )
-        for url, title, heading, content, score in rows
+        RetrievedChunk(
+            chunk=Chunk(
+                source_url=url, title=title, heading=heading, content=content, position=position
+            ),
+            score=float(score),
+        )
+        for url, title, heading, content, position, score in rows
     ]
 
 

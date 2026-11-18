@@ -24,15 +24,20 @@ class _Section:
 
 def chunk_document(document: Document, *, max_chars: int, overlap_chars: int) -> list[Chunk]:
     """Split a document into chunks of roughly `max_chars`, preserving source metadata."""
+    pieces = [
+        (section.heading, content)
+        for section in _split_sections(document)
+        for content in _split_body(section.body, max_chars, overlap_chars)
+    ]
     return [
         Chunk(
             source_url=document.url,
             title=document.title,
-            heading=section.heading,
+            heading=heading,
             content=content,
+            position=position,
         )
-        for section in _split_sections(document)
-        for content in _split_body(section.body, max_chars, overlap_chars)
+        for position, (heading, content) in enumerate(pieces)
     ]
 
 

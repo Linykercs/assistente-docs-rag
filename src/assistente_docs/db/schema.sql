@@ -25,3 +25,6 @@ ALTER TABLE chunks ADD COLUMN IF NOT EXISTS search_vector tsvector
     GENERATED ALWAYS AS (to_tsvector('portuguese', heading || ' ' || content)) STORED;
 
 CREATE INDEX IF NOT EXISTS chunks_search_idx ON chunks USING gin (search_vector);
+
+-- Order of the chunk inside its page, used to expand a retrieved chunk to its neighbors.
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS position INTEGER NOT NULL DEFAULT 0;

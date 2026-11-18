@@ -22,6 +22,8 @@ class ChunkStore(Protocol):
 
     def upsert(self, chunks: Sequence[Chunk], embeddings: Sequence[Sequence[float]]) -> None: ...
 
+    def update_positions(self, source_url: str, positions: Sequence[tuple[str, int]]) -> None: ...
+
     def delete_stale(self, source_url: str, keep_hashes: Collection[str]) -> int: ...
 
     def delete_other_sources(self, keep_urls: Collection[str]) -> int: ...
@@ -70,6 +72,8 @@ def ingest(
         if new_chunks:
             vectors = embedder.embed_passages([chunk.embedding_text for chunk in new_chunks])
             store.upsert(new_chunks, vectors)
+        # Chunks already stored keep their embedding, but their order may have changed.
+        store.update_positions(url, [(chunk.content_hash, chunk.position) for chunk in chunks])
         removed = store.delete_stale(url, [chunk.content_hash for chunk in chunks])
 
         total_chunks += len(chunks)
