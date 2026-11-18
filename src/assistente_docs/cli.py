@@ -101,7 +101,7 @@ def _ask(settings: Settings, question: str) -> None:
 def _eval(settings: Settings, *, dataset: Path, output_dir: Path) -> None:
     cases = load_cases(dataset)
     with (
-        open_llm(settings, model=settings.judge_model) as judge_llm,
+        open_llm(settings.for_judge(), model=settings.judge_model) as judge_llm,
         open_rag_service(settings) as service,
     ):
         results = run_evals(cases, service, LlmJudge(judge_llm))

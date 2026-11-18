@@ -30,6 +30,13 @@ class Settings(BaseSettings):
     # Only used by the Anthropic provider.
     llm_effort: Effort = "low"
     judge_model: str = "claude-sonnet-5-5"
+    # The judge can run on a different provider than the answers, so every model under test is
+    # graded by the same judge. Any field left unset falls back to the matching llm_* field.
+    judge_provider: LlmProvider | None = None
+    judge_base_url: str | None = None
+    judge_api_key: SecretStr | None = None
+    judge_reasoning_effort: str | None = None
+    judge_temperature: float | None = None
 
     embedding_model: str = "intfloat/multilingual-e5-large"
     embedding_dim: int = Field(default=1024, gt=0)
@@ -50,11 +57,35 @@ class Settings(BaseSettings):
     langfuse_secret_key: SecretStr | None = None
     langfuse_host: str = "https://cloud.langfuse.com"
 
-    @field_validator("llm_reasoning_effort", "llm_temperature", mode="before")
+    @field_validator(
+        "llm_reasoning_effort",
+        "llm_temperature",
+        "judge_provider",
+        "judge_base_url",
+        "judge_api_key",
+        "judge_reasoning_effort",
+        "judge_temperature",
+        mode="before",
+    )
     @classmethod
     def _empty_means_unset(cls, value: object) -> object:
         # CI passes these as empty strings when they don't apply to the chosen provider.
         return None if value == "" else value
+
+    def for_judge(self) -> "Settings":
+        """Settings whose llm_* fields point at the judge, for building the judge's LLM."""
+        overrides: dict[str, object] = {"llm_model": self.judge_model}
+        if self.judge_provider is not None:
+            overrides["llm_provider"] = self.judge_provider
+        if self.judge_base_url is not None:
+            overrides["llm_base_url"] = self.judge_base_url
+        if self.judge_api_key is not None:
+            overrides["llm_api_key"] = self.judge_api_key
+        if self.judge_reasoning_effort is not None:
+            overrides["llm_reasoning_effort"] = self.judge_reasoning_effort
+        if self.judge_temperature is not None:
+            overrides["llm_temperature"] = self.judge_temperature
+        return self.model_copy(update=overrides)
 
 
 @lru_cache
