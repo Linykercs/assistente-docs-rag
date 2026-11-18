@@ -11,7 +11,7 @@ from assistente_docs.embeddings import FastEmbedEmbedder
 from assistente_docs.observability import build_tracer
 from assistente_docs.rag.llm import AnthropicLlm, LlmAnswerer, StructuredLlm
 from assistente_docs.rag.openai_compat import OpenAICompatLlm
-from assistente_docs.rag.retrieval import VectorRetriever
+from assistente_docs.rag.retrieval import HybridRetriever, Retriever, VectorRetriever
 from assistente_docs.rag.service import RagService
 from assistente_docs.store import PgVectorStore
 
@@ -63,12 +63,24 @@ def open_llm(settings: Settings, *, model: str) -> Iterator[StructuredLlm]:
         )
 
 
+def build_retriever(settings: Settings, store: PgVectorStore) -> Retriever:
+    embedder = build_embedder(settings)
+    if settings.retrieval_mode == "hybrid":
+        return HybridRetriever(
+            embedder,
+            store,
+            top_k=settings.retrieval_top_k,
+            candidates=settings.retrieval_candidates,
+        )
+    return VectorRetriever(embedder, store, top_k=settings.retrieval_top_k)
+
+
 @contextmanager
 def open_rag_service(settings: Settings) -> Iterator[RagService]:
     """Build the full RAG service, releasing the DB pool and flushing traces on exit."""
     tracer = build_tracer(settings)
     with build_store(settings) as store, open_llm(settings, model=settings.llm_model) as llm:
-        retriever = VectorRetriever(build_embedder(settings), store, top_k=settings.retrieval_top_k)
+        retriever = build_retriever(settings, store)
         try:
             yield RagService(retriever, LlmAnswerer(llm), tracer)
         finally:

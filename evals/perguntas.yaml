@@ -7,8 +7,8 @@
 #   fonte: URL da página onde a resposta está
 #   trechos: termos que precisam estar nos chunks recuperados para a resposta ser possível.
 #            Cada termo foi conferido no texto da página da fonte depois da limpeza.
-#            Caso 6: PAYMENT_CONFIRMED está na resposta esperada, mas não na página da fonte
-#            (só em outras páginas), por isso não entra nos trechos.
+#            A resposta esperada só cobra o que está na página da fonte. (Até 19/11/2026 o
+#            caso 6 cobrava PAYMENT_CONFIRMED, que só aparece em outras páginas.)
 #   tem_resposta: false se a documentação não responde (o assistente deve dizer "não sei")
 
 - id: 1
@@ -54,7 +54,7 @@
 - id: 6
   categoria: webhooks
   pergunta: "Como configuro um webhook para saber quando um pagamento foi confirmado?"
-  resposta_esperada: "Na aplicação Asaas, acesse Menu do usuário > Integrações > Webhooks e clique em Criar Webhook. Informe a URL pública do seu endpoint (que recebe POST), e-mail, token de autenticação e tipo de envio, e selecione os eventos de cobrança, como `PAYMENT_CONFIRMED` (pagamento efetuado) e `PAYMENT_RECEIVED` (valor disponível na conta). O endpoint deve responder HTTP 200 após persistir o evento."
+  resposta_esperada: "Na aplicação Asaas, acesse Menu do usuário > Integrações > Webhooks e clique em Criar Webhook. Informe a URL pública do endpoint, que precisa aceitar requisições POST, o e-mail para alertas, o token de autenticação e o tipo de envio. Depois selecione os eventos que a aplicação precisa receber (por exemplo `PAYMENT_RECEIVED`), salve, provoque um evento para validar e faça o endpoint responder HTTP 200 depois de persistir o evento."
   fonte: "https://docs.asaas.com/docs/criar-novo-webhook-pela-aplicacao-web"
   trechos: ["Criar Webhook", "PAYMENT_RECEIVED"]
   tem_resposta: true
@@ -104,5 +104,20 @@
   categoria: ambigua
   pergunta: "Meu pagamento não apareceu, o que faço?"
   resposta_esperada: "O assistente deve pedir mais contexto (Pix ou boleto? sandbox ou produção? webhook configurado?) em vez de chutar."
+  fonte: ""
+  tem_resposta: true
+
+- id: 13
+  categoria: webhooks
+  pergunta: "Meu webhook parou de receber eventos. O que pode ter acontecido?"
+  resposta_esperada: "Quando as entregas falham, o Asaas faz novas tentativas; depois de 15 falhas consecutivas a fila do Webhook pode ser interrompida. Os eventos continuam sendo gerados, mas deixam de ser enviados até a fila ser reativada. Os Logs de Webhooks mostram as falhas."
+  fonte: "https://docs.asaas.com/docs/sobre-os-webhooks"
+  trechos: ["15 falhas consecutivas", "Logs de Webhooks"]
+  tem_resposta: true
+
+- id: 14
+  categoria: ambigua
+  pergunta: "Deu problema na minha cobrança, como resolvo?"
+  resposta_esperada: "O assistente deve perguntar qual é o problema (erro ao criar, pagamento não confirmado, webhook não recebido?) e de qual forma de pagamento se trata, em vez de chutar."
   fonte: ""
   tem_resposta: true

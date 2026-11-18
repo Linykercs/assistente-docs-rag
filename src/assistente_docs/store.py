@@ -25,6 +25,48 @@ _SEARCH = """
 """
 
 
+# Hybrid search: the vector and keyword candidate lists are merged with Reciprocal Rank
+# Fusion (score = sum of 1 / (k + rank) over the lists a chunk appears in). Keyword terms are
+# OR'ed: plainto_tsquery ANDs every word, and a full question would rarely match a chunk.
+# `score` stays the cosine similarity, so it means the same thing in both modes.
+_HYBRID_SEARCH = """
+    WITH semantic AS (
+        SELECT id, row_number() OVER (ORDER BY embedding <=> %(query)s::vector) AS rank
+        FROM chunks
+        ORDER BY embedding <=> %(query)s::vector
+        LIMIT %(candidates)s
+    ),
+    terms AS (
+        SELECT to_tsquery(
+            'portuguese',
+            replace(plainto_tsquery('portuguese', %(text)s)::text, '&', '|')
+        ) AS q
+        WHERE plainto_tsquery('portuguese', %(text)s)::text <> ''
+    ),
+    keyword AS (
+        SELECT c.id, row_number() OVER (ORDER BY ts_rank_cd(c.search_vector, t.q) DESC) AS rank
+        FROM chunks c, terms t
+        WHERE c.search_vector @@ t.q
+        ORDER BY ts_rank_cd(c.search_vector, t.q) DESC
+        LIMIT %(candidates)s
+    ),
+    fused AS (
+        SELECT coalesce(s.id, k.id) AS id,
+               coalesce(1.0 / (%(rrf_k)s + s.rank), 0)
+                 + coalesce(1.0 / (%(rrf_k)s + k.rank), 0) AS rrf
+        FROM semantic s FULL OUTER JOIN keyword k ON s.id = k.id
+    )
+    SELECT c.source_url, c.title, c.heading, c.content,
+           1 - (c.embedding <=> %(query)s::vector) AS score
+    FROM fused f JOIN chunks c ON c.id = f.id
+    ORDER BY f.rrf DESC
+    LIMIT %(top_k)s
+"""
+
+# Standard RRF constant: dampens the weight of the very first ranks.
+RRF_K = 60
+
+
 class PgVectorStore:
     def __init__(self, database_url: str, *, embedding_dim: int) -> None:
         self._pool = ConnectionPool(database_url, min_size=1, max_size=4, open=True)
@@ -96,13 +138,32 @@ class PgVectorStore:
         params = {"query": _vector_literal(embedding), "top_k": top_k}
         with self._pool.connection() as conn:
             rows = conn.execute(_SEARCH, params).fetchall()
-        return [
+        return _to_retrieved(rows)
+
+    def hybrid_search(
+        self, embedding: Sequence[float], text: str, *, top_k: int, candidates: int
+    ) -> list[RetrievedChunk]:
+        """Merge vector and keyword candidates with Reciprocal Rank Fusion."""
+        params = {
+            "query": _vector_literal(embedding),
+            "text": text,
+            "top_k": top_k,
+            "candidates": candidates,
+            "rrf_k": RRF_K,
+        }
+        with self._pool.connection() as conn:
+            rows = conn.execute(_HYBRID_SEARCH, params).fetchall()
+        return _to_retrieved(rows)
+
+
+def _to_retrieved(rows: Sequence[tuple[str, str, str, str, float]]) -> list[RetrievedChunk]:
+    return [
             RetrievedChunk(
                 chunk=Chunk(source_url=url, title=title, heading=heading, content=content),
                 score=float(score),
             )
-            for url, title, heading, content, score in rows
-        ]
+        for url, title, heading, content, score in rows
+    ]
 
 
 def _vector_literal(embedding: Sequence[float]) -> str:

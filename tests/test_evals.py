@@ -60,13 +60,17 @@ class FakeJudge:
 def test_dataset_loads_and_derives_the_expected_behavior() -> None:
     cases = {case.id: case for case in load_cases(DATASET)}
 
-    assert len(cases) == 12
+    assert len(cases) == 14
     assert cases[1].expected_status == "answered"
     assert cases[11].expected_status == "no_answer"
     assert cases[12].expected_status == "needs_clarification"
+    # A symptom with enough detail is answerable; a vague one asks for context.
+    assert cases[13].expected_status == "answered"
+    assert cases[14].expected_status == "needs_clarification"
     # Behavior-only cases are checked through the status, never by the correctness judge.
     assert not cases[11].has_reference_answer
     assert not cases[12].has_reference_answer
+    assert not cases[14].has_reference_answer
 
 
 def test_case_without_reference_skips_correctness_and_retrieval_metrics() -> None:
