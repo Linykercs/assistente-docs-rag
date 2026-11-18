@@ -219,7 +219,8 @@ demanda (`workflow_dispatch`): sobe um Postgres com pgvector, ingere a documenta
 perguntas e publica o relatório como artifact. O provedor é escolhido ao disparar o
 workflow: `local` (padrão) roda um modelo aberto com o Ollama no próprio runner, sem chave
 nem cota; `claude` usa o secret `ANTHROPIC_API_KEY`, `groq` usa `GROQ_API_KEY` e `gemini` usa
-`LLM_API_KEY`.
+`LLM_API_KEY`. O input `judge` fixa o juiz em outro provedor, para que modelos diferentes sejam
+corrigidos pelo mesmo critério.
 
 ### Resultados
 
@@ -250,6 +251,36 @@ gerando as respostas e atuando como juiz, temperatura 0 e as mesmas 12 perguntas
 
 Execuções: [antes](https://github.com/Linykercs/assistente-docs-rag/actions/runs/43313365653) ·
 [depois](https://github.com/Linykercs/assistente-docs-rag/actions/runs/43320325472).
+
+#### Comparação entre modelos
+
+Mesmas 12 perguntas, mesmo prompt e temperatura 0. Para a comparação valer, todos os modelos
+foram corrigidos pelo mesmo juiz (`openai/gpt-oss-120b` no Groq); na rodada anterior o 3B se
+dava nota sozinho.
+
+| Modelo | Comportamento | Citação | Retrieval hit | Corretude |
+| --- | --- | --- | --- | --- |
+| `qwen2.5:3b` (Ollama, CPU) | 9/11 | 7/7 | 9/9 | 2/9 |
+| `openai/gpt-oss-20b` | 12/12 | 10/10 | 10/10 | 5/10 |
+| `qwen/qwen3.8-27b` | 12/12 | 10/10 | 10/10 | 5/10 |
+| `openai/gpt-oss-120b` | 11/12 | 11/11 | 10/10 | 6/10 |
+
+- **Ressalvas:** o `gpt-oss-120b` foi juiz da própria rodada, o que pode favorecê-lo. Na
+  rodada do 3B um caso estourou o tempo e ficou de fora, por isso os totais menores.
+- **O que mudou com o tamanho:** de 3B para 20B a corretude mais que dobra, e o comportamento
+  chega a 12/12. De 20B para 120B o ganho é de uma pergunta.
+- **Onde travou:** as perguntas 1, 3, 6 e 7 falham em todos os modelos, mesmo com a página
+  certa recuperada. O juiz aponta omissões, como os headers `User-Agent` e `Content-Type` na
+  autenticação e a chamada `GET /v3/payments/{id}/pixQrCode` no Pix.
+- **Hipótese:** o retrieval hit mede a página, não o trecho. A página entra no contexto, mas o
+  chunk com o detalhe pode ficar fora dos 6 mais próximos. Se for isso, trocar de modelo não
+  resolve; o próximo passo é medir o retrieval por trecho e testar `top_k` maior e busca
+  híbrida.
+
+Execuções: [qwen2.5:3b](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44221757445) ·
+[gpt-oss-20b](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44218473254) ·
+[qwen3.8-27b](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44223197754) ·
+[gpt-oss-120b](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44222132909).
 
 ## Observabilidade
 
@@ -331,8 +362,9 @@ gcloud run deploy assistente-docs-rag \
 ## Status
 
 Em construção. A base do código já existe (ingestão, banco vetorial, API, evals, testes e CI),
-o gabarito das evals está preenchido e a primeira rodada de melhoria está medida em
-[Resultados](#resultados). Os próximos passos são comparar modelos maiores e publicar o deploy.
+o gabarito das evals está preenchido, e a primeira rodada de melhoria e a comparação entre
+modelos estão medidas em [Resultados](#resultados). Os próximos passos são medir o retrieval
+por trecho, que é o gargalo apontado pela comparação, e publicar o deploy.
 
 ## Roadmap
 
@@ -345,7 +377,8 @@ o gabarito das evals está preenchido e a primeira rodada de melhoria está medi
 - [x] Testes unitários, CI e workflow de evals
 - [x] Gabarito das evals preenchido e primeira linha de base
 - [x] Primeira melhoria de prompt medida pelas evals
-- [ ] Comparação entre modelos com a mesma suíte
+- [x] Comparação entre modelos com a mesma suíte e um juiz fixo
+- [ ] Retrieval medido por trecho, não só por página
 - [ ] Deploy público no Cloud Run
 - [ ] Parâmetros da referência da API (OpenAPI) indexados de forma estruturada
 - [ ] Busca híbrida (vetorial + full-text do Postgres)
