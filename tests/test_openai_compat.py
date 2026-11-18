@@ -33,7 +33,11 @@ def chat_response(content: str | None, **message: object) -> dict:
 
 
 def make_llm(
-    handler, *, reasoning_effort: str | None = None, temperature: float | None = None
+    handler,
+    *,
+    reasoning_effort: str | None = None,
+    temperature: float | None = None,
+    seed: int | None = None,
 ) -> tuple[OpenAICompatLlm, list[httpx.Request]]:
     requests: list[httpx.Request] = []
 
@@ -49,6 +53,7 @@ def make_llm(
         model="openai/x",
         reasoning_effort=reasoning_effort,
         temperature=temperature,
+        seed=seed,
         sleep=SLEEPS.append,
     )
     return llm, requests
@@ -173,6 +178,13 @@ def test_temperature_and_seed_are_sent_only_when_configured() -> None:
     assert "temperature" not in json.loads(requests[0].content)
 
     llm, requests = make_llm(ok, temperature=0)
+    LlmAnswerer(llm).answer("Pergunta?", [make_retrieved(1)])
+    payload = json.loads(requests[0].content)
+    assert payload["temperature"] == 0
+    # Gemini rejects "seed", so temperature alone must not add it.
+    assert "seed" not in payload
+
+    llm, requests = make_llm(ok, temperature=0, seed=0)
     LlmAnswerer(llm).answer("Pergunta?", [make_retrieved(1)])
     payload = json.loads(requests[0].content)
     assert (payload["temperature"], payload["seed"]) == (0, 0)
@@ -301,3 +313,28 @@ def test_empty_judge_settings_from_ci_mean_unset() -> None:
 
     assert judge.llm_provider == settings.llm_provider
     assert judge.llm_base_url == settings.llm_base_url
+
+
+def test_a_judge_on_another_provider_does_not_inherit_the_answer_seed() -> None:
+    # Ollama answers with a fixed seed; a Gemini judge would reject it with HTTP 400.
+    settings = Settings(
+        _env_file=None,
+        llm_provider="openai_compat",
+        llm_base_url="http://localhost:11434/v1",
+        llm_api_key="ollama",
+        llm_temperature=0,
+        llm_seed=0,
+        llm_reasoning_effort="high",
+        judge_provider="openai_compat",
+        judge_base_url="https://generativelanguage.googleapis.com/v1beta/openai",
+        judge_api_key="gemini-key",
+        judge_temperature=0,
+        judge_model="gemini-flash-latest",
+    )
+
+    judge = settings.for_judge()
+
+    assert judge.llm_seed is None
+    assert judge.llm_reasoning_effort is None
+    assert judge.llm_temperature == 0
+    assert judge.llm_base_url == "https://generativelanguage.googleapis.com/v1beta/openai"

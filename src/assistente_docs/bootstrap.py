@@ -59,6 +59,7 @@ def open_llm(settings: Settings, *, model: str) -> Iterator[StructuredLlm]:
             model=model,
             reasoning_effort=settings.llm_reasoning_effort,
             temperature=settings.llm_temperature,
+            seed=settings.llm_seed,
         )
 
 

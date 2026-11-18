@@ -70,6 +70,7 @@ class OpenAICompatLlm:
         model: str,
         reasoning_effort: str | None = None,
         temperature: float | None = None,
+        seed: int | None = None,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self._client = client
@@ -78,6 +79,7 @@ class OpenAICompatLlm:
         self._model = model
         self._reasoning_effort = reasoning_effort
         self._temperature = temperature
+        self._seed = seed
         self._sleep = sleep
 
     @property
@@ -106,8 +108,10 @@ class OpenAICompatLlm:
             payload["reasoning_effort"] = self._reasoning_effort
         if self._temperature is not None:
             payload["temperature"] = self._temperature
-            # Ollama also honors a fixed seed, which removes the remaining randomness.
-            payload["seed"] = 0
+        # Ollama and Groq honor a fixed seed, which removes the remaining randomness.
+        # Gemini rejects the field, so it is only sent when configured.
+        if self._seed is not None:
+            payload["seed"] = self._seed
         response = self._post(payload)
         if response.status_code != httpx.codes.OK:
             raise LlmError(f"LLM API returned HTTP {response.status_code}: {response.text[:500]}")
