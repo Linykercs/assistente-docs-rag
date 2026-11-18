@@ -31,6 +31,10 @@ on:
         type: choice
         options: [vector, hybrid]
         default: vector
+      expand_top:
+        description: "Trechos expandidos para vizinhos e seção (0 = desligado)"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -98,6 +102,7 @@ jobs:
           JUDGE_MODEL_INPUT: ${{ inputs.judge_model }}
           TOP_K: ${{ inputs.top_k }}
           RETRIEVAL: ${{ inputs.retrieval }}
+          EXPAND_TOP: ${{ inputs.expand_top }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.LLM_API_KEY }}
         run: |
@@ -118,6 +123,7 @@ jobs:
 
           if [ -n "$TOP_K" ]; then echo "RETRIEVAL_TOP_K=$TOP_K" >> "$GITHUB_ENV"; fi
           echo "RETRIEVAL_MODE=${RETRIEVAL:-vector}" >> "$GITHUB_ENV"
+          if [ -n "$EXPAND_TOP" ]; then echo "CONTEXT_EXPAND_TOP=$EXPAND_TOP" >> "$GITHUB_ENV"; fi
 
           # A fixed judge grades every model the same way. Answers keep the provider above.
           case "$JUDGE" in

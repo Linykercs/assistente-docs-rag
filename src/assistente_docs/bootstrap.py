@@ -9,6 +9,7 @@ import httpx
 from assistente_docs.config import Settings
 from assistente_docs.embeddings import FastEmbedEmbedder
 from assistente_docs.observability import build_tracer
+from assistente_docs.rag.expansion import ExpandingRetriever
 from assistente_docs.rag.llm import AnthropicLlm, LlmAnswerer, StructuredLlm
 from assistente_docs.rag.openai_compat import OpenAICompatLlm
 from assistente_docs.rag.retrieval import HybridRetriever, Retriever, VectorRetriever
@@ -65,14 +66,24 @@ def open_llm(settings: Settings, *, model: str) -> Iterator[StructuredLlm]:
 
 def build_retriever(settings: Settings, store: PgVectorStore) -> Retriever:
     embedder = build_embedder(settings)
+    retriever: Retriever
     if settings.retrieval_mode == "hybrid":
-        return HybridRetriever(
+        retriever = HybridRetriever(
             embedder,
             store,
             top_k=settings.retrieval_top_k,
             candidates=settings.retrieval_candidates,
         )
-    return VectorRetriever(embedder, store, top_k=settings.retrieval_top_k)
+    else:
+        retriever = VectorRetriever(embedder, store, top_k=settings.retrieval_top_k)
+    if settings.context_expand_top:
+        retriever = ExpandingRetriever(
+            retriever,
+            store,
+            expand_top=settings.context_expand_top,
+            max_chars=settings.context_group_max_chars,
+        )
+    return retriever
 
 
 @contextmanager

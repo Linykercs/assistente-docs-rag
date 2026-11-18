@@ -1,6 +1,7 @@
 """In-memory stand-ins for the components that need network, a database or an API key."""
 
 from collections.abc import Collection, Sequence
+from dataclasses import replace
 
 from assistente_docs.models import Chunk, RagAnswer, RetrievedChunk
 from assistente_docs.rag.llm import Completion
@@ -71,6 +72,11 @@ class InMemoryChunkStore:
     def upsert(self, chunks: Sequence[Chunk], embeddings: Sequence[Sequence[float]]) -> None:
         for chunk, _ in zip(chunks, embeddings, strict=True):
             self.chunks.setdefault(chunk.content_hash, chunk)
+
+    def update_positions(self, source_url: str, positions: Sequence[tuple[str, int]]) -> None:
+        for content_hash, position in positions:
+            chunk = self.chunks[content_hash]
+            self.chunks[content_hash] = replace(chunk, position=position)
 
     def delete_stale(self, source_url: str, keep_hashes: Collection[str]) -> int:
         stale = self.existing_hashes(source_url) - set(keep_hashes)
