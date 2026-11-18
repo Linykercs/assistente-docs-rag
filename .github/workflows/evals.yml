@@ -61,6 +61,8 @@ jobs:
       LLM_REASONING_EFFORT: ${{ (inputs.provider == 'groq' || inputs.provider == 'gemini') && 'low' || '' }}
       # Repeatable answers, so a change in the scores comes from the code, not from sampling.
       LLM_TEMPERATURE: ${{ inputs.provider != 'claude' && '0' || '' }}
+      # Ollama and Groq accept a fixed seed; Gemini rejects the field.
+      LLM_SEED: ${{ (inputs.provider == 'local' || inputs.provider == 'groq') && '0' || '' }}
       DEFAULT_MODEL: >-
         ${{ inputs.provider == 'local' && 'qwen2.5:3b'
         || inputs.provider == 'groq' && 'openai/gpt-oss-120b'
@@ -111,7 +113,8 @@ jobs:
               echo "JUDGE_BASE_URL=https://api.groq.com/openai/v1" >> "$GITHUB_ENV"
               echo "JUDGE_API_KEY=$GROQ_API_KEY" >> "$GITHUB_ENV"
               echo "JUDGE_REASONING_EFFORT=low" >> "$GITHUB_ENV"
-              echo "JUDGE_TEMPERATURE=0" >> "$GITHUB_ENV" ;;
+              echo "JUDGE_TEMPERATURE=0" >> "$GITHUB_ENV"
+              echo "JUDGE_SEED=0" >> "$GITHUB_ENV" ;;
             gemini)
               echo "JUDGE_MODEL=${JUDGE_MODEL_INPUT:-gemini-flash-latest}" >> "$GITHUB_ENV"
               echo "JUDGE_PROVIDER=openai_compat" >> "$GITHUB_ENV"

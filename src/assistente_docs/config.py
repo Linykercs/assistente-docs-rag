@@ -27,16 +27,21 @@ class Settings(BaseSettings):
     llm_reasoning_effort: str | None = None
     # Only used by the OpenAI-compatible provider. 0 makes answers repeatable between eval runs.
     llm_temperature: float | None = None
+    # Only used by the OpenAI-compatible provider. Ollama and Groq accept it; Gemini does not.
+    llm_seed: int | None = None
     # Only used by the Anthropic provider.
     llm_effort: Effort = "low"
     judge_model: str = "claude-sonnet-5-5"
     # The judge can run on a different provider than the answers, so every model under test is
-    # graded by the same judge. Any field left unset falls back to the matching llm_* field.
+    # graded by the same judge. Without JUDGE_PROVIDER the judge reuses the answer provider and
+    # any judge_* field left unset falls back to the matching llm_* field. With JUDGE_PROVIDER
+    # the judge block stands alone: provider-specific llm_* fields are not carried over.
     judge_provider: LlmProvider | None = None
     judge_base_url: str | None = None
     judge_api_key: SecretStr | None = None
     judge_reasoning_effort: str | None = None
     judge_temperature: float | None = None
+    judge_seed: int | None = None
 
     embedding_model: str = "intfloat/multilingual-e5-large"
     embedding_dim: int = Field(default=1024, gt=0)
@@ -60,11 +65,13 @@ class Settings(BaseSettings):
     @field_validator(
         "llm_reasoning_effort",
         "llm_temperature",
+        "llm_seed",
         "judge_provider",
         "judge_base_url",
         "judge_api_key",
         "judge_reasoning_effort",
         "judge_temperature",
+        "judge_seed",
         mode="before",
     )
     @classmethod
@@ -74,17 +81,22 @@ class Settings(BaseSettings):
 
     def for_judge(self) -> "Settings":
         """Settings whose llm_* fields point at the judge, for building the judge's LLM."""
+        judge_fields = {
+            "llm_base_url": self.judge_base_url,
+            "llm_api_key": self.judge_api_key,
+            "llm_reasoning_effort": self.judge_reasoning_effort,
+            "llm_temperature": self.judge_temperature,
+            "llm_seed": self.judge_seed,
+        }
         overrides: dict[str, object] = {"llm_model": self.judge_model}
-        if self.judge_provider is not None:
-            overrides["llm_provider"] = self.judge_provider
-        if self.judge_base_url is not None:
-            overrides["llm_base_url"] = self.judge_base_url
-        if self.judge_api_key is not None:
-            overrides["llm_api_key"] = self.judge_api_key
-        if self.judge_reasoning_effort is not None:
-            overrides["llm_reasoning_effort"] = self.judge_reasoning_effort
-        if self.judge_temperature is not None:
-            overrides["llm_temperature"] = self.judge_temperature
+        if self.judge_provider is None:
+            # Same provider as the answers: only what the judge sets explicitly changes.
+            overrides |= {key: value for key, value in judge_fields.items() if value is not None}
+        else:
+            # Another provider: nothing provider-specific leaks over from the answer side.
+            overrides |= {"llm_provider": self.judge_provider, **judge_fields}
+            if self.judge_base_url is None:
+                overrides.pop("llm_base_url")
         return self.model_copy(update=overrides)
 
 
