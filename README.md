@@ -308,12 +308,46 @@ só o `top_k` mudou: mesmo modelo (`openai/gpt-oss-20b`), mesmo juiz (`openai/gp
 - **O que falta:** as perguntas 6 e 7 seguem sem o trecho certo. A 7 pede eventos espalhados
   por três seções da página, e a 6 depende do passo a passo da interface. Busca híbrida e
   chunks por seção inteira são os próximos testes.
-- **Gabarito:** a resposta esperada da pergunta 6 cita `PAYMENT_CONFIRMED`, que não está na
-  página da fonte (só em outras páginas); o termo ficou fora dos `trechos`.
+- **Gabarito:** a resposta esperada da pergunta 6 citava `PAYMENT_CONFIRMED`, que não está
+  na página da fonte (só em outras páginas). Corrigida na rodada seguinte.
 
 Execuções: [top_k 6](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44235001930) ·
 [top_k 10](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44235997544) ·
 [top_k 15](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44237238393).
+
+#### Busca híbrida e prompt
+
+Antes desta rodada, o gabarito mudou: a pergunta 6 passou a cobrar só o que a página diz, e
+entraram dois casos. O 13 é um relato de problema respondível ("meu webhook parou de receber
+eventos") e o 14 um relato vago ("deu problema na minha cobrança"). Com um caso ambíguo só,
+ajustar o prompt seria afinar para uma pergunta; o 13 pega o erro oposto, pedir contexto
+demais. Mesmo modelo e juiz, `top_k` 10, 14 perguntas.
+
+| Rodada | Comportamento | Context hit | Corretude |
+| --- | --- | --- | --- |
+| Vetorial (linha de base) | 12/14 | 9/11 | 8/11 |
+| Híbrida | 13/14 | 7/11 | 6/11 |
+| **Vetorial + prompt novo** | **13/14** | 9/11 | 8/11 |
+
+- **A busca híbrida piorou.** Ela soma busca por palavras (full-text do Postgres, termos com
+  OR) à vetorial e junta as listas por Reciprocal Rank Fusion. Não trouxe o trecho certo das
+  perguntas 6 e 7 e tirou o das perguntas 1 e 13. A pergunta 7 ("quais eventos existem para
+  cobranças?") mostra o porquê: os termos que faltam (`PAYMENT_CREATED`...) não estão na
+  pergunta, então a busca por palavras não tem o que procurar, e palavras comuns como
+  "webhook" e "cobrança" puxam trechos genéricos. O código ficou, desligado
+  (`RETRIEVAL_MODE=vector`); o problema das perguntas 6 e 7 é o chunking, que quebra a lista
+  de eventos em três seções.
+- **O prompt novo ficou.** Ele proíbe citar endpoint, campo ou evento fora dos trechos mesmo
+  com ressalva ("normalmente...") e separa relato de problema com recurso e sintoma (responde)
+  de relato vago (pede contexto). A pergunta 14 passou a pedir contexto, a 13 continuou sendo
+  respondida, e a 12 trocou a resposta inventada por "não encontrei na documentação". Ainda
+  não é o pedido de contexto esperado, mas deixou de inventar.
+- **Corretude empatada.** A 4 passou a acertar e a 1 a errar: com o trecho certo no contexto,
+  o modelo chamou o `User-Agent` de opcional. Variação do modelo, não do retrieval.
+
+Execuções: [vetorial](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44346040496) ·
+[híbrida](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44348116327) ·
+[vetorial + prompt](https://github.com/Linykercs/assistente-docs-rag/actions/runs/44351053018).
 
 ## Observabilidade
 
@@ -389,15 +423,17 @@ gcloud run deploy assistente-docs-rag \
 - **Provedor de LLM trocável.** O código de RAG e de evals depende só de uma interface
   (`StructuredLlm`). O Claude é o padrão; o adaptador compatível com OpenAI permite rodar de
   graça com Groq ou Gemini e comparar modelos com as mesmas evals.
-- **Busca só vetorial.** Simples de entender e de medir. Busca híbrida entra no roadmap se as
-  evals mostrarem falhas com termos exatos (nomes de eventos, campos).
+- **Busca vetorial por padrão.** A híbrida (`RETRIEVAL_MODE=hybrid`) foi medida e piorou o
+  contexto neste conjunto: as perguntas falham por termos que o usuário não digita, e aí a
+  busca por palavras não ajuda. Fica disponível para reavaliar com outro chunking.
 
 ## Status
 
 Em construção. A base do código já existe (ingestão, banco vetorial, API, evals, testes e CI),
 o gabarito das evals está preenchido, e a melhoria de prompt, a comparação entre modelos e o
-ajuste do contexto estão medidos em [Resultados](#resultados). Os próximos passos são busca
-híbrida para as perguntas que ainda não recebem o trecho certo e o deploy público.
+ajuste do contexto estão medidos em [Resultados](#resultados). Os próximos passos são chunks
+que mantenham listas inteiras (as perguntas 6 e 7 ainda não recebem o trecho certo) e o
+deploy público.
 
 ## Roadmap
 
@@ -414,7 +450,8 @@ híbrida para as perguntas que ainda não recebem o trecho certo e o deploy púb
 - [x] Retrieval medido por trecho (context hit) e `top_k` ajustado de 6 para 10
 - [ ] Deploy público no Cloud Run
 - [ ] Parâmetros da referência da API (OpenAPI) indexados de forma estruturada
-- [ ] Busca híbrida (vetorial + full-text do Postgres)
+- [x] Busca híbrida (vetorial + full-text do Postgres): medida, piorou, fica desligada
+- [ ] Chunking que mantenha listas e passo a passo inteiros
 - [ ] Evals automáticas a cada mudança de prompt ou de chunking
 
 ## Licença
