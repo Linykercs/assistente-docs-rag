@@ -162,7 +162,12 @@
       const list = sources.length
         ? `<ol class="sources">${sources.map((s) => `<li value="${s.id}"><a href="${escapeHtml(s.url)}" rel="noopener">${escapeHtml(s.title)}</a>${s.section ? ` <span class="muted">· ${escapeHtml(s.section)}</span>` : ""}</li>`).join("")}</ol>`
         : "";
-      show(data.status, `<div class="answer">${renderAnswer(data.answer || "", sources)}</div>${list}`);
+      const usage = data.usage;
+      const seconds = usage ? (usage.retrieve_ms + usage.answer_ms) / 1000 : 0;
+      const meta = usage && usage.input_tokens
+        ? `<p class="muted">${usage.input_tokens.toLocaleString("pt-BR")} tokens de entrada, ${usage.output_tokens.toLocaleString("pt-BR")} de saída · ${seconds.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} s</p>`
+        : "";
+      show(data.status, `<div class="answer">${renderAnswer(data.answer || "", sources)}</div>${list}${meta}`);
     } catch {
       show("error", `<p class="answer">Sem conexão com o servidor. Tente de novo em instantes.</p>`);
     } finally {

@@ -119,3 +119,36 @@ def test_vector_retriever_ignores_the_keyword_side() -> None:
     VectorRetriever(FakeEmbedder(), index, top_k=6).retrieve("pergunta")
 
     assert index.calls == [{"mode": "vector", "embedding": [8.0], "top_k": 6}]
+
+
+class StepClock:
+    """Each call advances 0.25 s, so every timed stage measures exactly 250 ms."""
+
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def __call__(self) -> float:
+        self.now += 0.25
+        return self.now
+
+
+def test_ask_records_tokens_and_time_of_each_stage() -> None:
+    draft = AnswerDraft(status="answered", answer="Resposta [1].", cited_ids=[1])
+    service = RagService(
+        FakeRetriever([make_retrieved(1)]), FakeAnswerer(draft), NoopTracer(), clock=StepClock()
+    )
+
+    usage = service.ask("Como me autentico?").usage
+
+    assert (usage.input_tokens, usage.output_tokens) == (100, 20)
+    assert (usage.retrieve_ms, usage.answer_ms) == (250.0, 250.0)
+
+
+def test_question_without_context_costs_no_tokens() -> None:
+    draft = AnswerDraft(status="answered", answer="Resposta inventada.", cited_ids=[])
+    service = RagService(FakeRetriever([]), FakeAnswerer(draft), NoopTracer(), clock=StepClock())
+
+    usage = service.ask("Como emito nota fiscal?").usage
+
+    assert (usage.input_tokens, usage.output_tokens, usage.answer_ms) == (0, 0, 0.0)
+    assert usage.retrieve_ms == 250.0

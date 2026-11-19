@@ -24,11 +24,21 @@ class SourceOut(BaseModel):
     score: float = Field(description="Similaridade de cosseno entre a pergunta e o trecho.")
 
 
+class UsageOut(BaseModel):
+    input_tokens: int = Field(
+        description="Tokens enviados ao LLM (instruções + trechos + pergunta)."
+    )
+    output_tokens: int = Field(description="Tokens gerados pelo LLM.")
+    retrieve_ms: float = Field(description="Tempo da busca dos trechos, em milissegundos.")
+    answer_ms: float = Field(description="Tempo da chamada ao LLM, em milissegundos.")
+
+
 class AskResponse(BaseModel):
     status: AnswerStatus
     answer: str
     sources: list[SourceOut]
     model: str | None
+    usage: UsageOut
 
     @classmethod
     def from_answer(cls, answer: RagAnswer) -> Self:
@@ -37,6 +47,7 @@ class AskResponse(BaseModel):
             answer=answer.answer,
             sources=[SourceOut(**asdict(source)) for source in answer.sources],
             model=answer.model,
+            usage=UsageOut(**asdict(answer.usage)),
         )
 
 

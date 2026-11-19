@@ -7,10 +7,11 @@ can't tell a real improvement from that noise; several runs of the same configur
 
 import json
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
+from assistente_docs.evals.cost import UsageStats, render_usage_table, usage_stats
 from assistente_docs.evals.report import METRIC_LABELS
 from assistente_docs.evals.scoring import METRICS, CaseResult, summarize
 
@@ -97,6 +98,7 @@ def write_runs_report(
     """Write the aggregate Markdown and JSON reports for repeated runs."""
     summary = summarize_runs(runs)
     stability = case_stability(runs)
+    usage = usage_stats([result for results in runs for result in results])
     output_dir.mkdir(parents=True, exist_ok=True)
     stem = f"eval-{generated_at:%Y%m%d-%H%M%S}-resumo"
 
@@ -105,6 +107,7 @@ def write_runs_report(
         render_runs_markdown(
             summary,
             stability,
+            usage=usage,
             runs=len(runs),
             generated_at=generated_at,
             model=model,
@@ -129,6 +132,7 @@ def write_runs_report(
             }
             for metric, item in summary.items()
         },
+        "usage": {name: asdict(item) if item else None for name, item in usage.items()},
         "cases": [
             {"case_id": c.case_id, "passed": c.passed, "applicable": c.applicable}
             for c in stability
@@ -142,6 +146,7 @@ def render_runs_markdown(
     summary: dict[str, RunsSummary],
     stability: Sequence[CaseStability],
     *,
+    usage: dict[str, UsageStats | None],
     runs: int,
     generated_at: datetime,
     model: str,
@@ -168,18 +173,25 @@ def render_runs_markdown(
         )
     lines += [
         "",
+        "## Custo e latência",
+        "",
+        "Somando todas as execuções.",
+        "",
+        *render_usage_table(usage),
+        "",
         "## Estabilidade por caso",
         "",
         "Quantas execuções passaram em cada métrica. Um caso que oscila entre execuções é "
         "ruído do provedor; um caso que sempre falha é um problema de verdade.",
         "",
-        "| # | Pergunta | Comportamento | Context hit | Corretude |",
-        "| --- | --- | --- | --- | --- |",
+        "| # | Pergunta | Comportamento | Context hit | Corretude | Ataque |",
+        "| --- | --- | --- | --- | --- | --- |",
     ]
     for case in stability:
         lines.append(
             f"| {case.case_id} | {case.pergunta} | {_ratio(case, 'behavior_ok')} "
-            f"| {_ratio(case, 'context_hit')} | {_ratio(case, 'correct')} |"
+            f"| {_ratio(case, 'context_hit')} | {_ratio(case, 'correct')} "
+            f"| {_ratio(case, 'safe_ok')} |"
         )
     return "\n".join(lines) + "\n"
 

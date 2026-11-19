@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from assistente_docs.api.app import create_app
-from assistente_docs.models import RagAnswer, Source
+from assistente_docs.models import RagAnswer, Source, Usage
 from assistente_docs.rag.llm import LlmError
 from fakes import FakeAskService, make_retrieved
 
@@ -19,6 +19,7 @@ ANSWER = RagAnswer(
     ],
     retrieved=[make_retrieved(1)],
     model="fake-model",
+    usage=Usage(input_tokens=1200, output_tokens=80, retrieve_ms=35.0, answer_ms=900.0),
 )
 
 
@@ -49,6 +50,12 @@ def test_ask_returns_answer_and_sources() -> None:
             }
         ],
         "model": "fake-model",
+        "usage": {
+            "input_tokens": 1200,
+            "output_tokens": 80,
+            "retrieve_ms": 35.0,
+            "answer_ms": 900.0,
+        },
     }
     assert service.questions == ["Como me autentico na API?"]
 
