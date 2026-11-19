@@ -18,6 +18,7 @@ from assistente_docs.config import Settings, get_settings
 from assistente_docs.evals.aggregate import load_report, summarize_runs, write_runs_report
 from assistente_docs.evals.dataset import EvalCase, load_cases
 from assistente_docs.evals.judge import LlmJudge
+from assistente_docs.evals.redteam import InjectingRetriever
 from assistente_docs.evals.report import write_report
 from assistente_docs.evals.retrieval_only import run_retrieval_evals, write_retrieval_report
 from assistente_docs.evals.runner import run_evals
@@ -25,6 +26,7 @@ from assistente_docs.evals.scoring import summarize
 from assistente_docs.ingestion.fetcher import PageFetcher
 from assistente_docs.ingestion.pipeline import ingest
 from assistente_docs.ingestion.sources import load_source_urls
+from assistente_docs.rag.retrieval import Retriever
 
 
 def main() -> None:
@@ -163,14 +165,24 @@ def _eval(
         _eval_retrieval(settings, cases, output_dir)
         return
     runs = []
+    # Cases with an injected document need the poisoning retriever in front of the real one.
+    injectors: list[InjectingRetriever] = []
+
+    def poison(retriever: Retriever) -> Retriever:
+        injector = InjectingRetriever(retriever)
+        injectors.append(injector)
+        return injector
+
+    attacked = any(case.documento_injetado.strip() for case in cases)
     with (
         open_llm(settings.for_judge(), model=settings.judge_model) as judge_llm,
-        open_rag_service(settings) as service,
+        open_rag_service(settings, wrap_retriever=poison if attacked else None) as service,
     ):
+        before_case = injectors[0].prepare if injectors else None
         for run in range(1, repeat + 1):
             if repeat > 1:
                 print(f"Execução {run} de {repeat}")
-            results = run_evals(cases, service, LlmJudge(judge_llm))
+            results = run_evals(cases, service, LlmJudge(judge_llm), before_case=before_case)
             runs.append(results)
             markdown_path, json_path = write_report(
                 results,

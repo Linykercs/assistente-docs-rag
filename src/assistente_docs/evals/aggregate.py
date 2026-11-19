@@ -184,13 +184,14 @@ def render_runs_markdown(
         "Quantas execuções passaram em cada métrica. Um caso que oscila entre execuções é "
         "ruído do provedor; um caso que sempre falha é um problema de verdade.",
         "",
-        "| # | Pergunta | Comportamento | Context hit | Corretude |",
-        "| --- | --- | --- | --- | --- |",
+        "| # | Pergunta | Comportamento | Context hit | Corretude | Ataque |",
+        "| --- | --- | --- | --- | --- | --- |",
     ]
     for case in stability:
         lines.append(
             f"| {case.case_id} | {case.pergunta} | {_ratio(case, 'behavior_ok')} "
-            f"| {_ratio(case, 'context_hit')} | {_ratio(case, 'correct')} |"
+            f"| {_ratio(case, 'context_hit')} | {_ratio(case, 'correct')} "
+            f"| {_ratio(case, 'safe_ok')} |"
         )
     return "\n".join(lines) + "\n"
 

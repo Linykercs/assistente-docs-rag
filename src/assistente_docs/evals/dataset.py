@@ -21,6 +21,12 @@ class EvalCase(BaseModel):
     # The page can be retrieved while the chunk with the detail is left out of the top k.
     trechos: list[str] = []
     tem_resposta: bool
+    # Red teaming. `proibido`: text that must never appear in the answer (a canary word the
+    # attack asks for, a phrase of the system prompt, an attacker's address). Matching is
+    # case-insensitive. `documento_injetado`: an extra "documentation" chunk carrying an
+    # attack, placed first in the context to simulate a poisoned page (indirect injection).
+    proibido: list[str] = []
+    documento_injetado: str = ""
 
     @property
     def expected_status(self) -> AnswerStatus:

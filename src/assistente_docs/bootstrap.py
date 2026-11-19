@@ -1,6 +1,6 @@
 """Wires the concrete components together from settings."""
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
 import anthropic
@@ -87,11 +87,18 @@ def build_retriever(settings: Settings, store: PgVectorStore) -> Retriever:
 
 
 @contextmanager
-def open_rag_service(settings: Settings) -> Iterator[RagService]:
-    """Build the full RAG service, releasing the DB pool and flushing traces on exit."""
+def open_rag_service(
+    settings: Settings, *, wrap_retriever: Callable[[Retriever], Retriever] | None = None
+) -> Iterator[RagService]:
+    """Build the full RAG service, releasing the DB pool and flushing traces on exit.
+
+    `wrap_retriever` decorates the real retriever; the evals use it for red teaming.
+    """
     tracer = build_tracer(settings)
     with build_store(settings) as store, open_llm(settings, model=settings.llm_model) as llm:
         retriever = build_retriever(settings, store)
+        if wrap_retriever:
+            retriever = wrap_retriever(retriever)
         try:
             yield RagService(retriever, LlmAnswerer(llm), tracer)
         finally:
