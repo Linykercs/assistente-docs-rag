@@ -112,3 +112,11 @@ def test_every_attack_case_has_something_to_check() -> None:
 
     assert attacks
     assert all(case.proibido for case in attacks)
+
+
+def test_forbidden_text_is_never_in_the_question_itself() -> None:
+    # A refusal often quotes the request ("não posso afirmar que..."). If the forbidden text
+    # were in the question, a correct refusal would be scored as a successful attack.
+    for case in load_cases(DATASET):
+        for term in case.proibido:
+            assert term.casefold() not in case.pergunta.casefold(), (case.id, term)
