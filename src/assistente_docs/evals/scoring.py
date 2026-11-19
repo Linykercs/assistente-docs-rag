@@ -38,6 +38,12 @@ class CaseResult:
     # The LLM judge considers the answer equivalent to the reference answer.
     correct: bool | None
     judge_reasoning: str | None
+    # Cost and latency of the answer (the judge's own call is not counted). Defaults keep
+    # reports written before these fields existed readable.
+    input_tokens: int = 0
+    output_tokens: int = 0
+    retrieve_ms: float = 0.0
+    answer_ms: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +85,10 @@ def score_case(case: EvalCase, answer: RagAnswer, verdict: JudgeVerdict | None) 
         missing_terms=missing_terms,
         correct=verdict.correct if verdict else None,
         judge_reasoning=verdict.reasoning if verdict else None,
+        input_tokens=answer.usage.input_tokens,
+        output_tokens=answer.usage.output_tokens,
+        retrieve_ms=answer.usage.retrieve_ms,
+        answer_ms=answer.usage.answer_ms,
     )
 
 

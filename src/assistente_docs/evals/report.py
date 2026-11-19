@@ -6,6 +6,7 @@ from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
+from assistente_docs.evals.cost import render_usage_table, usage_stats
 from assistente_docs.evals.scoring import METRICS, CaseResult, MetricSummary, summarize
 
 METRIC_LABELS = {
@@ -47,6 +48,9 @@ def write_report(
             metric: {"passed": item.passed, "total": item.total, "rate": item.rate}
             for metric, item in summary.items()
         },
+        "usage": {
+            name: asdict(item) if item else None for name, item in usage_stats(results).items()
+        },
         "cases": [asdict(result) for result in results],
     }
     json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -82,6 +86,10 @@ def render_markdown(
         "Cada métrica considera só os casos em que ela se aplica: sem `fonte` preenchida não "
         "há retrieval hit, sem `trechos` não há context hit, e sem `resposta_esperada` não há "
         "avaliação de corretude.",
+        "",
+        "## Custo e latência",
+        "",
+        *render_usage_table(usage_stats(results)),
         "",
         "## Casos",
         "",
